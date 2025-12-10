@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php artisan migrate:*)",
+      "Bash(php artisan config:show:*)",
+      "Bash(php artisan vendor:publish:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
