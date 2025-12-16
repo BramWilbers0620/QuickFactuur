@@ -65,7 +65,7 @@
                                         Bedrag
                                     </th>
                                     <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                        Aangemaakt
+                                        Status
                                     </th>
                                     <th scope="col" class="px-6 py-4 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
                                         Acties
@@ -99,21 +99,50 @@
                                             </div>
                                             <div class="text-xs text-slate-500 mt-1">incl. BTW</div>
                                         </td>
-                                        <td class="px-6 py-5 whitespace-nowrap text-sm text-slate-500">
-                                            {{ $invoice->created_at->format('d-m-Y H:i') }}
+                                        <td class="px-6 py-5 whitespace-nowrap">
+                                            @php
+                                                $status = $invoice->status ?? 'concept';
+                                                $statusColors = [
+                                                    'concept' => 'bg-slate-100 text-slate-700 border-slate-200',
+                                                    'verzonden' => 'bg-blue-100 text-blue-700 border-blue-200',
+                                                    'betaald' => 'bg-emerald-100 text-emerald-700 border-emerald-200',
+                                                    'te_laat' => 'bg-red-100 text-red-700 border-red-200',
+                                                ];
+                                                $statusLabels = [
+                                                    'concept' => 'Concept',
+                                                    'verzonden' => 'Verzonden',
+                                                    'betaald' => 'Betaald',
+                                                    'te_laat' => 'Te laat',
+                                                ];
+                                            @endphp
+                                            <select onchange="updateStatus({{ $invoice->id }}, this.value)"
+                                                    class="text-sm font-medium px-3 py-1.5 rounded-full border cursor-pointer {{ $statusColors[$status] }}">
+                                                @foreach($statusLabels as $value => $label)
+                                                    <option value="{{ $value }}" {{ $status === $value ? 'selected' : '' }}>{{ $label }}</option>
+                                                @endforeach
+                                            </select>
                                         </td>
                                         <td class="px-6 py-5 whitespace-nowrap text-right">
-                                            @if($invoice->pdf_path)
-                                                <a href="{{ route('invoice.download', $invoice) }}"
-                                                   class="inline-flex items-center px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 text-sm font-medium rounded-lg transition-colors">
-                                                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                                    </svg>
-                                                    Download
-                                                </a>
-                                            @else
-                                                <span class="text-slate-400 text-sm">Niet beschikbaar</span>
-                                            @endif
+                                            <div class="flex items-center justify-end gap-2">
+                                                @if($invoice->pdf_path)
+                                                    <a href="{{ route('invoice.download', $invoice) }}"
+                                                       class="inline-flex items-center px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 text-sm font-medium rounded-lg transition-colors"
+                                                       title="Download PDF">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                                        </svg>
+                                                    </a>
+                                                @endif
+                                                @if($invoice->customer_email)
+                                                    <button onclick="sendEmail({{ $invoice->id }})"
+                                                            class="inline-flex items-center px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-600 text-sm font-medium rounded-lg transition-colors"
+                                                            title="Verstuur per e-mail">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                                        </svg>
+                                                    </button>
+                                                @endif
+                                            </div>
                                         </td>
                                     </tr>
                                 @endforeach
@@ -191,4 +220,65 @@
             @endif
         </div>
     </div>
+
+    <script>
+        function updateStatus(invoiceId, status) {
+            fetch(`/facturen/${invoiceId}/status`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({ status: status })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Refresh page to show updated colors
+                    location.reload();
+                } else {
+                    alert('Er ging iets mis bij het updaten van de status.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Er ging iets mis bij het updaten van de status.');
+            });
+        }
+
+        function sendEmail(invoiceId) {
+            if (!confirm('Wil je deze factuur per e-mail versturen naar de klant?')) {
+                return;
+            }
+
+            const button = event.target.closest('button');
+            button.disabled = true;
+            button.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+
+            fetch(`/facturen/${invoiceId}/email`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Factuur is succesvol verzonden per e-mail!');
+                    location.reload();
+                } else {
+                    alert(data.message || 'Er ging iets mis bij het versturen van de e-mail.');
+                    button.disabled = false;
+                    button.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Er ging iets mis bij het versturen van de e-mail.');
+                button.disabled = false;
+                button.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>';
+            });
+        }
+    </script>
 </x-app-layout>
