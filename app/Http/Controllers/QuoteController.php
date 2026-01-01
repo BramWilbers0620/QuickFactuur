@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use App\Models\Quote;
 use App\Models\Customer;
+use App\Http\Controllers\DashboardController;
 use PDF;
 
 class QuoteController extends Controller
@@ -85,16 +87,24 @@ class QuoteController extends Controller
 
         // Handle logo
         $logoData = null;
-        if ($request->hasFile('logo') && extension_loaded('gd')) {
-            try {
-                $file = $request->file('logo');
-                $imageData = file_get_contents($file->getRealPath());
-                $extension = strtolower($file->getClientOriginalExtension());
-                $mimeTypes = ['png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg'];
-                $mimeType = $mimeTypes[$extension] ?? 'image/png';
-                $logoData = 'data:' . $mimeType . ';base64,' . base64_encode($imageData);
-            } catch (\Exception $e) {
-                Log::warning('Logo processing failed', ['error' => $e->getMessage()]);
+        $logoWarning = null;
+
+        if ($request->hasFile('logo')) {
+            if (!extension_loaded('gd')) {
+                $logoWarning = 'Logo kon niet worden verwerkt: GD extensie niet beschikbaar.';
+                Log::warning('Logo processing failed: GD extension not loaded');
+            } else {
+                try {
+                    $file = $request->file('logo');
+                    $imageData = file_get_contents($file->getRealPath());
+                    $extension = strtolower($file->getClientOriginalExtension());
+                    $mimeTypes = ['png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg'];
+                    $mimeType = $mimeTypes[$extension] ?? 'image/png';
+                    $logoData = 'data:' . $mimeType . ';base64,' . base64_encode($imageData);
+                } catch (\Exception $e) {
+                    $logoWarning = 'Logo kon niet worden verwerkt. De offerte is aangemaakt zonder logo.';
+                    Log::warning('Logo processing failed', ['error' => $e->getMessage()]);
+                }
             }
         }
 
@@ -117,13 +127,13 @@ class QuoteController extends Controller
         $vat = round($subtotal * $vatRate, 2);
         $total = round($subtotal + $vat, 2);
 
-        $quoteCount = Quote::where('user_id', auth()->id())->count();
-        $quoteNumber = sprintf('OFF%04d', $quoteCount + 1);
-
         $validUntil = Carbon::parse($validated['quote_date'])->addDays($validated['valid_days']);
 
+        // Quote number will be generated inside transaction
+        $quoteNumber = null;
+
         $data = [
-            'quote_number' => $quoteNumber,
+            'quote_number' => null, // Will be set after generation
             'date' => Carbon::parse($validated['quote_date'])->format('d-m-Y'),
             'valid_until' => $validUntil->format('d-m-Y'),
             'logo_data' => $logoData,
@@ -151,32 +161,46 @@ class QuoteController extends Controller
         ];
 
         try {
-            $quote = Quote::create([
-                'user_id' => auth()->id(),
-                'quote_number' => $quoteNumber,
-                'company_name' => $validated['company_name'],
-                'company_email' => $validated['company_email'],
-                'company_address' => $validated['company_address'],
-                'company_phone' => $validated['company_phone'] ?? null,
-                'company_kvk' => $validated['company_kvk'] ?? null,
-                'company_iban' => $validated['company_iban'] ?? null,
-                'customer_name' => $validated['customer_name'],
-                'customer_email' => $validated['customer_email'] ?? null,
-                'customer_address' => $validated['customer_address'] ?? null,
-                'customer_phone' => $validated['customer_phone'] ?? null,
-                'quote_date' => $validated['quote_date'],
-                'valid_until' => $validUntil,
-                'description' => $processedItems[0]['description'] ?? 'Diverse',
-                'items' => $processedItems,
-                'amount' => $subtotal,
-                'vat_amount' => $vat,
-                'vat_rate' => $validated['vat_rate'],
-                'total' => $total,
-                'notes' => $validated['notes'] ?? null,
-                'brand_color' => $validated['brand_color'],
-                'status' => 'concept',
-            ]);
+            // Use transaction to ensure data consistency
+            $result = DB::transaction(function () use ($validated, $processedItems, $subtotal, $vat, $total, $validUntil, &$data, &$quoteNumber) {
+                // Generate quote number with locking to prevent race conditions
+                $quoteNumber = Quote::generateNextNumber(auth()->id());
 
+                // Update data array with the generated quote number
+                $data['quote_number'] = $quoteNumber;
+
+                $quote = Quote::create([
+                    'user_id' => auth()->id(),
+                    'quote_number' => $quoteNumber,
+                    'company_name' => $validated['company_name'],
+                    'company_email' => $validated['company_email'],
+                    'company_address' => $validated['company_address'],
+                    'company_phone' => $validated['company_phone'] ?? null,
+                    'company_kvk' => $validated['company_kvk'] ?? null,
+                    'company_iban' => $validated['company_iban'] ?? null,
+                    'customer_name' => $validated['customer_name'],
+                    'customer_email' => $validated['customer_email'] ?? null,
+                    'customer_address' => $validated['customer_address'] ?? null,
+                    'customer_phone' => $validated['customer_phone'] ?? null,
+                    'quote_date' => $validated['quote_date'],
+                    'valid_until' => $validUntil,
+                    'description' => $processedItems[0]['description'] ?? 'Diverse',
+                    'items' => $processedItems,
+                    'amount' => $subtotal,
+                    'vat_amount' => $vat,
+                    'vat_rate' => $validated['vat_rate'],
+                    'total' => $total,
+                    'notes' => $validated['notes'] ?? null,
+                    'brand_color' => $validated['brand_color'],
+                    'status' => 'concept',
+                ]);
+
+                return $quote;
+            });
+
+            $quote = $result;
+
+            // Generate PDF outside transaction (file operations shouldn't be in DB transaction)
             $pdf = PDF::loadView('quotes.pdf', $data);
 
             $pdfFileName = 'offerte-' . $quoteNumber . '.pdf';
@@ -184,6 +208,14 @@ class QuoteController extends Controller
             Storage::disk('local')->put($pdfPath, $pdf->output());
 
             $quote->update(['pdf_path' => $pdfPath]);
+
+            // Clear dashboard cache since we have new data
+            DashboardController::clearStatsCache(auth()->id());
+
+            // Flash logo warning if there was one
+            if ($logoWarning) {
+                session()->flash('warning', $logoWarning);
+            }
 
             return $pdf->download($pdfFileName);
         } catch (\Exception $e) {
@@ -203,9 +235,7 @@ class QuoteController extends Controller
      */
     public function download(Quote $quote)
     {
-        if ($quote->user_id !== auth()->id()) {
-            abort(403);
-        }
+        $this->authorize('download', $quote);
 
         if (!$quote->pdf_path || !Storage::disk('local')->exists($quote->pdf_path)) {
             return redirect()->route('quotes.index')
@@ -223,17 +253,13 @@ class QuoteController extends Controller
      */
     public function convertToInvoice(Quote $quote)
     {
-        if ($quote->user_id !== auth()->id()) {
-            abort(403);
-        }
-
-        if (!$quote->canConvertToInvoice()) {
-            return redirect()->back()
-                ->with('error', 'Deze offerte kan niet worden omgezet naar een factuur.');
-        }
+        $this->authorize('convert', $quote);
 
         try {
             $invoice = $quote->convertToInvoice();
+
+            // Clear dashboard cache since we have new data
+            DashboardController::clearStatsCache(auth()->id());
 
             return redirect()->route('invoice.index')
                 ->with('success', 'Offerte omgezet naar factuur ' . $invoice->invoice_number);
@@ -253,9 +279,7 @@ class QuoteController extends Controller
      */
     public function updateStatus(Request $request, Quote $quote)
     {
-        if ($quote->user_id !== auth()->id()) {
-            abort(403);
-        }
+        $this->authorize('update', $quote);
 
         $validated = $request->validate([
             'status' => 'required|in:concept,verzonden,geaccepteerd,afgewezen,verlopen',

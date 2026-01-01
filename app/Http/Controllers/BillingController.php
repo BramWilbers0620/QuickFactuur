@@ -81,7 +81,42 @@ class BillingController extends Controller
      */
     public function success(Request $request)
     {
+        $validated = $request->validate([
+            'session_id' => 'required|string|max:255',
+        ]);
+
         $user = Auth::user();
+
+        // Verify the session with Stripe
+        try {
+            $stripe = new \Stripe\StripeClient(config('cashier.secret'));
+            $session = $stripe->checkout->sessions->retrieve($validated['session_id']);
+
+            // Verify this session belongs to this user's Stripe customer
+            if ($session->customer !== $user->stripe_id) {
+                Log::warning('Stripe session customer mismatch', [
+                    'user_id' => $user->id,
+                    'session_customer' => $session->customer,
+                    'user_stripe_id' => $user->stripe_id,
+                ]);
+                return redirect()->route('billing')
+                    ->with('error', 'Er ging iets mis bij het verifiëren van je betaling.');
+            }
+
+            // Check session was successful
+            if ($session->payment_status !== 'paid' && $session->status !== 'complete') {
+                return redirect()->route('billing')
+                    ->with('error', 'Je betaling is nog niet voltooid.');
+            }
+        } catch (\Exception $e) {
+            Log::error('Stripe session verification failed', [
+                'user_id' => $user->id,
+                'session_id' => $validated['session_id'],
+                'error' => $e->getMessage(),
+            ]);
+            return redirect()->route('billing')
+                ->with('error', 'Er ging iets mis bij het verifiëren van je betaling.');
+        }
 
         // Verwijder trial_ends_at nu ze een betaald abonnement hebben
         if ($user->trial_ends_at) {

@@ -34,21 +34,37 @@ Route::middleware(['auth', 'throttle:10,1'])->group(function () {
 Route::middleware(['auth', 'subscribed'])->group(function () {
     Route::get('/facturen', [InvoiceController::class, 'index'])->name('invoice.index');
     Route::get('/facturen/nieuw', [InvoiceController::class, 'create'])->name('invoice.create');
-    Route::post('/facturen/genereren', [InvoiceController::class, 'generate'])->name('invoice.generate');
     Route::get('/facturen/{invoice}', [InvoiceController::class, 'show'])->name('invoice.show');
     Route::get('/facturen/{invoice}/download', [InvoiceController::class, 'download'])->name('invoice.download');
-    Route::patch('/facturen/{invoice}/status', [InvoiceController::class, 'updateStatus'])->name('invoice.status');
-    Route::post('/facturen/{invoice}/email', [InvoiceController::class, 'sendEmail'])->name('invoice.email');
+
+    // Rate limited routes (prevent abuse)
+    Route::post('/facturen/genereren', [InvoiceController::class, 'generate'])
+        ->middleware('throttle:20,1')
+        ->name('invoice.generate');
+    Route::patch('/facturen/{invoice}/status', [InvoiceController::class, 'updateStatus'])
+        ->middleware('throttle:30,1')
+        ->name('invoice.status');
+    Route::post('/facturen/{invoice}/email', [InvoiceController::class, 'sendEmail'])
+        ->middleware('throttle:10,1')
+        ->name('invoice.email');
 });
 
 // Offertes — alleen mogelijk voor betalende gebruikers
 Route::middleware(['auth', 'subscribed'])->group(function () {
     Route::get('/offertes', [QuoteController::class, 'index'])->name('quotes.index');
     Route::get('/offertes/nieuw', [QuoteController::class, 'create'])->name('quotes.create');
-    Route::post('/offertes/genereren', [QuoteController::class, 'generate'])->name('quotes.generate');
     Route::get('/offertes/{quote}/download', [QuoteController::class, 'download'])->name('quotes.download');
-    Route::post('/offertes/{quote}/omzetten', [QuoteController::class, 'convertToInvoice'])->name('quotes.convert');
-    Route::patch('/offertes/{quote}/status', [QuoteController::class, 'updateStatus'])->name('quotes.status');
+
+    // Rate limited routes (prevent abuse)
+    Route::post('/offertes/genereren', [QuoteController::class, 'generate'])
+        ->middleware('throttle:20,1')
+        ->name('quotes.generate');
+    Route::post('/offertes/{quote}/omzetten', [QuoteController::class, 'convertToInvoice'])
+        ->middleware('throttle:20,1')
+        ->name('quotes.convert');
+    Route::patch('/offertes/{quote}/status', [QuoteController::class, 'updateStatus'])
+        ->middleware('throttle:30,1')
+        ->name('quotes.status');
 });
 
 // Klantenbeheer — alleen mogelijk voor betalende gebruikers

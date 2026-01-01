@@ -56,10 +56,7 @@ class CustomerController extends Controller
      */
     public function edit(Customer $customer): View|RedirectResponse
     {
-        // Ensure user owns this customer
-        if ($customer->user_id !== auth()->id()) {
-            abort(403);
-        }
+        $this->authorize('update', $customer);
 
         return view('customers.edit', compact('customer'));
     }
@@ -69,10 +66,7 @@ class CustomerController extends Controller
      */
     public function update(Request $request, Customer $customer): RedirectResponse
     {
-        // Ensure user owns this customer
-        if ($customer->user_id !== auth()->id()) {
-            abort(403);
-        }
+        $this->authorize('update', $customer);
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -94,10 +88,7 @@ class CustomerController extends Controller
      */
     public function destroy(Customer $customer): RedirectResponse
     {
-        // Ensure user owns this customer
-        if ($customer->user_id !== auth()->id()) {
-            abort(403);
-        }
+        $this->authorize('delete', $customer);
 
         $customer->delete();
 
@@ -110,10 +101,7 @@ class CustomerController extends Controller
      */
     public function show(Customer $customer)
     {
-        // Ensure user owns this customer
-        if ($customer->user_id !== auth()->id()) {
-            abort(403);
-        }
+        $this->authorize('view', $customer);
 
         return response()->json($customer);
     }

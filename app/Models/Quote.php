@@ -5,10 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 
 class Quote extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'user_id',
@@ -128,63 +130,73 @@ class Quote extends Model
 
     /**
      * Convert quote to invoice.
+     * Uses transaction to ensure data consistency.
      */
     public function convertToInvoice(): Invoice
     {
-        $invoice = Invoice::create([
-            'user_id' => $this->user_id,
-            'invoice_number' => Invoice::generateNextNumber($this->user_id),
-            'company_name' => $this->company_name,
-            'company_address' => $this->company_address,
-            'company_email' => $this->company_email,
-            'company_phone' => $this->company_phone,
-            'company_vat' => $this->company_vat,
-            'company_kvk' => $this->company_kvk,
-            'company_iban' => $this->company_iban,
-            'customer_name' => $this->customer_name,
-            'customer_email' => $this->customer_email,
-            'customer_address' => $this->customer_address,
-            'customer_phone' => $this->customer_phone,
-            'customer_vat' => $this->customer_vat,
-            'invoice_date' => now(),
-            'payment_terms' => '30',
-            'description' => $this->description,
-            'items' => $this->items,
-            'amount' => $this->amount,
-            'vat_amount' => $this->vat_amount,
-            'total' => $this->total,
-            'vat_rate' => $this->vat_rate,
-            'notes' => $this->notes,
-            'template' => $this->template,
-            'brand_color' => $this->brand_color,
-            'logo_path' => $this->logo_path,
-            'status' => 'concept',
-        ]);
+        return DB::transaction(function () {
+            $invoice = Invoice::create([
+                'user_id' => $this->user_id,
+                'invoice_number' => Invoice::generateNextNumber($this->user_id),
+                'company_name' => $this->company_name,
+                'company_address' => $this->company_address,
+                'company_email' => $this->company_email,
+                'company_phone' => $this->company_phone,
+                'company_vat' => $this->company_vat,
+                'company_kvk' => $this->company_kvk,
+                'company_iban' => $this->company_iban,
+                'customer_name' => $this->customer_name,
+                'customer_email' => $this->customer_email,
+                'customer_address' => $this->customer_address,
+                'customer_phone' => $this->customer_phone,
+                'customer_vat' => $this->customer_vat,
+                'invoice_date' => now(),
+                'due_date' => now()->addDays(30),
+                'payment_terms' => '30',
+                'description' => $this->description,
+                'items' => $this->items,
+                'amount' => $this->amount,
+                'vat_amount' => $this->vat_amount,
+                'total' => $this->total,
+                'vat_rate' => $this->vat_rate,
+                'notes' => $this->notes,
+                'template' => $this->template,
+                'brand_color' => $this->brand_color,
+                'logo_path' => $this->logo_path,
+                'status' => 'concept',
+            ]);
 
-        $this->update([
-            'status' => 'geaccepteerd',
-            'accepted_at' => now(),
-            'converted_invoice_id' => $invoice->id,
-        ]);
+            $this->update([
+                'status' => 'geaccepteerd',
+                'accepted_at' => now(),
+                'converted_invoice_id' => $invoice->id,
+            ]);
 
-        return $invoice;
+            return $invoice;
+        });
     }
 
     /**
      * Generate next quote number for user.
+     * Uses database locking to prevent race conditions.
      */
     public static function generateNextNumber(int $userId): string
     {
-        $lastQuote = self::where('user_id', $userId)
-            ->orderBy('id', 'desc')
-            ->first();
+        return DB::transaction(function () use ($userId) {
+            // Include soft-deleted records to avoid reusing quote numbers
+            $lastQuote = self::withTrashed()
+                ->where('user_id', $userId)
+                ->lockForUpdate()
+                ->orderBy('id', 'desc')
+                ->first();
 
-        if (!$lastQuote) {
-            return 'OFF0001';
-        }
+            if (!$lastQuote) {
+                return 'OFF0001';
+            }
 
-        $number = intval(substr($lastQuote->quote_number, 3)) + 1;
-        return 'OFF' . str_pad($number, 4, '0', STR_PAD_LEFT);
+            $number = intval(substr($lastQuote->quote_number, 3)) + 1;
+            return 'OFF' . str_pad($number, 4, '0', STR_PAD_LEFT);
+        });
     }
 
     /**

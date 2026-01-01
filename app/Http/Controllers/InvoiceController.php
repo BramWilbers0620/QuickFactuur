@@ -4,12 +4,14 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 use App\Models\Invoice;
 use App\Models\Customer;
 use App\Mail\InvoiceMail;
+use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Mail;
 use PDF;
 
@@ -108,24 +110,31 @@ class InvoiceController extends Controller
         // Handle logo upload - convert to base64 for PDF
         // Note: Requires PHP GD extension to be enabled
         $logoData = null;
-        if ($request->hasFile('logo') && extension_loaded('gd')) {
-            try {
-                $file = $request->file('logo');
-                $imageData = file_get_contents($file->getRealPath());
+        $logoWarning = null;
 
-                // Determine mime type from extension
-                $extension = strtolower($file->getClientOriginalExtension());
-                $mimeTypes = [
-                    'png' => 'image/png',
-                    'jpg' => 'image/jpeg',
-                    'jpeg' => 'image/jpeg',
-                ];
-                $mimeType = $mimeTypes[$extension] ?? 'image/png';
+        if ($request->hasFile('logo')) {
+            if (!extension_loaded('gd')) {
+                $logoWarning = 'Logo kon niet worden verwerkt: GD extensie niet beschikbaar.';
+                Log::warning('Logo processing failed: GD extension not loaded');
+            } else {
+                try {
+                    $file = $request->file('logo');
+                    $imageData = file_get_contents($file->getRealPath());
 
-                $logoData = 'data:' . $mimeType . ';base64,' . base64_encode($imageData);
-            } catch (\Exception $e) {
-                // Logo processing failed, continue without logo
-                Log::warning('Logo processing failed', ['error' => $e->getMessage()]);
+                    // Determine mime type from extension
+                    $extension = strtolower($file->getClientOriginalExtension());
+                    $mimeTypes = [
+                        'png' => 'image/png',
+                        'jpg' => 'image/jpeg',
+                        'jpeg' => 'image/jpeg',
+                    ];
+                    $mimeType = $mimeTypes[$extension] ?? 'image/png';
+
+                    $logoData = 'data:' . $mimeType . ';base64,' . base64_encode($imageData);
+                } catch (\Exception $e) {
+                    $logoWarning = 'Logo kon niet worden verwerkt. De factuur is aangemaakt zonder logo.';
+                    Log::warning('Logo processing failed', ['error' => $e->getMessage()]);
+                }
             }
         }
 
@@ -149,16 +158,15 @@ class InvoiceController extends Controller
         $vat = round($subtotal * $vatRate, 2);
         $total = round($subtotal + $vat, 2);
 
-        // Generate sequential invoice number for this user
-        $invoiceCount = Invoice::where('user_id', auth()->id())->count();
-        $invoiceNumber = sprintf('FAC%04d', $invoiceCount + 1);
-
         // Calculate due date
         $paymentDays = $validated['payment_terms'] === 'direct' ? 0 : (int) $validated['payment_terms'];
         $dueDate = Carbon::parse($validated['invoice_date'])->addDays($paymentDays)->format('d-m-Y');
 
+        // Generate invoice number will be done inside transaction
+        $invoiceNumber = null;
+
         $data = [
-            'invoice_number' => $invoiceNumber,
+            'invoice_number' => null, // Will be set after generation
             'date' => Carbon::parse($validated['invoice_date'])->format('d-m-Y'),
             'due_date' => $dueDate,
             'payment_terms' => $validated['payment_terms'],
@@ -187,30 +195,48 @@ class InvoiceController extends Controller
         ];
 
         try {
-            // Store invoice in database
-            $invoice = Invoice::create([
-                'user_id' => auth()->id(),
-                'invoice_number' => $invoiceNumber,
-                'company_name' => $validated['company_name'],
-                'company_email' => $validated['company_email'],
-                'company_address' => $validated['company_address'],
-                'company_phone' => $validated['company_phone'] ?? null,
-                'company_kvk' => $validated['company_kvk'] ?? null,
-                'company_iban' => $validated['company_iban'] ?? null,
-                'customer_name' => $validated['customer_name'],
-                'customer_email' => $validated['customer_email'] ?? null,
-                'customer_address' => $validated['customer_address'] ?? null,
-                'customer_phone' => $validated['customer_phone'] ?? null,
-                'invoice_date' => $validated['invoice_date'],
-                'payment_terms' => $validated['payment_terms'],
-                'description' => $processedItems[0]['description'] ?? 'Diverse',
-                'items' => $processedItems,
-                'amount' => $subtotal,
-                'vat_amount' => $vat,
-                'total' => $total,
-                'notes' => $validated['notes'] ?? null,
-            ]);
+            // Calculate due date for database storage
+            $dueDateForDb = Carbon::parse($validated['invoice_date'])->addDays($paymentDays);
 
+            // Use transaction to ensure data consistency
+            $result = DB::transaction(function () use ($validated, $processedItems, $subtotal, $vat, $total, $dueDateForDb, $logoData, &$data, &$invoiceNumber) {
+                // Generate invoice number with locking to prevent race conditions
+                $invoiceNumber = Invoice::generateNextNumber(auth()->id());
+
+                // Update data array with the generated invoice number
+                $data['invoice_number'] = $invoiceNumber;
+
+                // Store invoice in database
+                $invoice = Invoice::create([
+                    'user_id' => auth()->id(),
+                    'invoice_number' => $invoiceNumber,
+                    'company_name' => $validated['company_name'],
+                    'company_email' => $validated['company_email'],
+                    'company_address' => $validated['company_address'],
+                    'company_phone' => $validated['company_phone'] ?? null,
+                    'company_kvk' => $validated['company_kvk'] ?? null,
+                    'company_iban' => $validated['company_iban'] ?? null,
+                    'customer_name' => $validated['customer_name'],
+                    'customer_email' => $validated['customer_email'] ?? null,
+                    'customer_address' => $validated['customer_address'] ?? null,
+                    'customer_phone' => $validated['customer_phone'] ?? null,
+                    'invoice_date' => $validated['invoice_date'],
+                    'due_date' => $dueDateForDb,
+                    'payment_terms' => $validated['payment_terms'],
+                    'description' => $processedItems[0]['description'] ?? 'Diverse',
+                    'items' => $processedItems,
+                    'amount' => $subtotal,
+                    'vat_amount' => $vat,
+                    'total' => $total,
+                    'notes' => $validated['notes'] ?? null,
+                ]);
+
+                return $invoice;
+            });
+
+            $invoice = $result;
+
+            // Generate PDF outside transaction (file operations shouldn't be in DB transaction)
             $pdf = PDF::loadView('invoice.pdf', $data);
 
             // Save PDF to storage
@@ -227,6 +253,14 @@ class InvoiceController extends Controller
                 'invoice_number' => $invoiceNumber,
                 'amount' => $total,
             ]);
+
+            // Clear dashboard cache since we have new data
+            DashboardController::clearStatsCache(auth()->id());
+
+            // Flash logo warning if there was one
+            if ($logoWarning) {
+                session()->flash('warning', $logoWarning);
+            }
 
             return $pdf->download($pdfFileName);
         } catch (\Exception $e) {
@@ -246,10 +280,7 @@ class InvoiceController extends Controller
      */
     public function download(Invoice $invoice)
     {
-        // Ensure user owns this invoice
-        if ($invoice->user_id !== auth()->id()) {
-            abort(403);
-        }
+        $this->authorize('download', $invoice);
 
         // Check if PDF exists
         if (!$invoice->pdf_path || !Storage::disk('local')->exists($invoice->pdf_path)) {
@@ -268,9 +299,7 @@ class InvoiceController extends Controller
      */
     public function updateStatus(Request $request, Invoice $invoice)
     {
-        if ($invoice->user_id !== auth()->id()) {
-            abort(403);
-        }
+        $this->authorize('update', $invoice);
 
         $validated = $request->validate([
             'status' => 'required|in:concept,verzonden,betaald,te_laat',
@@ -296,9 +325,7 @@ class InvoiceController extends Controller
      */
     public function sendEmail(Invoice $invoice)
     {
-        if ($invoice->user_id !== auth()->id()) {
-            abort(403);
-        }
+        $this->authorize('sendEmail', $invoice);
 
         if (!$invoice->customer_email) {
             return redirect()->back()->with('error', 'Deze klant heeft geen e-mailadres.');
@@ -337,9 +364,7 @@ class InvoiceController extends Controller
      */
     public function show(Invoice $invoice)
     {
-        if ($invoice->user_id !== auth()->id()) {
-            abort(403);
-        }
+        $this->authorize('view', $invoice);
 
         return view('invoice.show', compact('invoice'));
     }
