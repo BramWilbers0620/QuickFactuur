@@ -1,8 +1,0 @@
-<svg width="120" height="40" viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="120" height="40" rx="8" fill="#3B82F6"/>
-  <path d="M12 12h8v16h-8z" fill="#FFFFFF"/>
-  <path d="M22 16h8v12h-8z" fill="#FFFFFF" opacity="0.7"/>
-  <path d="M32 20h8v8h-8z" fill="#FFFFFF" opacity="0.4"/>
-  <text x="48" y="16" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="600" fill="#FFFFFF">QuickFactuur</text>
-  <text x="48" y="26" font-family="system-ui, -apple-system, sans-serif" font-size="6" fill="#FFFFFF" opacity="0.8">Professioneel factureren</text>
-</svg>
