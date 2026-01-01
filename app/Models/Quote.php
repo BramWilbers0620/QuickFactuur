@@ -183,7 +183,9 @@ class Quote extends Model
     public static function generateNextNumber(int $userId): string
     {
         return DB::transaction(function () use ($userId) {
-            $lastQuote = self::where('user_id', $userId)
+            // Include soft-deleted records to avoid reusing quote numbers
+            $lastQuote = self::withTrashed()
+                ->where('user_id', $userId)
                 ->lockForUpdate()
                 ->orderBy('id', 'desc')
                 ->first();

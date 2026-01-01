@@ -164,7 +164,9 @@ class Invoice extends Model
     public static function generateNextNumber(int $userId): string
     {
         return DB::transaction(function () use ($userId) {
-            $lastInvoice = self::where('user_id', $userId)
+            // Include soft-deleted records to avoid reusing invoice numbers
+            $lastInvoice = self::withTrashed()
+                ->where('user_id', $userId)
                 ->lockForUpdate()
                 ->orderBy('id', 'desc')
                 ->first();
