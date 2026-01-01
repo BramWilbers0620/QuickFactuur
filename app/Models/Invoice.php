@@ -5,10 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 
 class Invoice extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'user_id',
@@ -157,18 +159,22 @@ class Invoice extends Model
 
     /**
      * Generate next invoice number for user.
+     * Uses database locking to prevent race conditions.
      */
     public static function generateNextNumber(int $userId): string
     {
-        $lastInvoice = self::where('user_id', $userId)
-            ->orderBy('id', 'desc')
-            ->first();
+        return DB::transaction(function () use ($userId) {
+            $lastInvoice = self::where('user_id', $userId)
+                ->lockForUpdate()
+                ->orderBy('id', 'desc')
+                ->first();
 
-        if (!$lastInvoice) {
-            return 'FAC0001';
-        }
+            if (!$lastInvoice) {
+                return 'FAC0001';
+            }
 
-        $number = intval(substr($lastInvoice->invoice_number, 3)) + 1;
-        return 'FAC' . str_pad($number, 4, '0', STR_PAD_LEFT);
+            $number = intval(substr($lastInvoice->invoice_number, 3)) + 1;
+            return 'FAC' . str_pad($number, 4, '0', STR_PAD_LEFT);
+        });
     }
 }

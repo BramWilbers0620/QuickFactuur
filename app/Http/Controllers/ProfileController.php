@@ -47,8 +47,13 @@ class ProfileController extends Controller
             'company_name' => 'nullable|string|max:255',
             'company_address' => 'nullable|string|max:255',
             'company_phone' => 'nullable|string|max:50',
-            'company_kvk' => 'nullable|string|max:20',
-            'company_iban' => 'nullable|string|max:50',
+            // Dutch KVK number is exactly 8 digits
+            'company_kvk' => ['nullable', 'string', 'max:20', 'regex:/^(\d{8})?$/'],
+            // IBAN format: 2 letters, 2 digits, then alphanumeric (NL91ABNA0417164300)
+            'company_iban' => ['nullable', 'string', 'max:34', 'regex:/^([A-Z]{2}\d{2}[A-Z0-9]{1,30})?$/'],
+        ], [
+            'company_kvk.regex' => 'Het KVK-nummer moet uit 8 cijfers bestaan.',
+            'company_iban.regex' => 'Voer een geldig IBAN-nummer in (bijv. NL91ABNA0417164300).',
         ]);
 
         $request->user()->update($validated);

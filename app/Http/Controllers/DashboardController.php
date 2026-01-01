@@ -6,6 +6,7 @@ use App\Models\Invoice;
 use App\Models\Quote;
 use App\Models\Customer;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 
 class DashboardController extends Controller
 {
@@ -17,10 +18,24 @@ class DashboardController extends Controller
         // Calculate statistics only if user has access
         $stats = null;
         if ($user->hasActiveAccess()) {
-            $stats = $this->calculateStats($userId);
+            // Cache statistics for 5 minutes per user
+            $stats = Cache::remember(
+                "dashboard_stats_{$userId}",
+                now()->addMinutes(5),
+                fn() => $this->calculateStats($userId)
+            );
         }
 
         return view('dashboard', compact('stats'));
+    }
+
+    /**
+     * Clear cached dashboard stats for a user.
+     * Call this when invoices/quotes are created/updated.
+     */
+    public static function clearStatsCache(int $userId): void
+    {
+        Cache::forget("dashboard_stats_{$userId}");
     }
 
     private function calculateStats(int $userId): array
