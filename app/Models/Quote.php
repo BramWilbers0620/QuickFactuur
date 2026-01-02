@@ -108,7 +108,7 @@ class Quote extends Model
      */
     public function convertedInvoice(): BelongsTo
     {
-        return $this->belongsTo(Invoice::class, 'converted_invoice_id');
+        return $this->belongsTo(Invoice::class, 'converted_invoice_id')->withTrashed();
     }
 
     /**
@@ -135,6 +135,16 @@ class Quote extends Model
     public function convertToInvoice(): Invoice
     {
         return DB::transaction(function () {
+            // Get user's default payment terms
+            $user = User::find($this->user_id);
+
+            if (!$user) {
+                throw new \RuntimeException("User with ID {$this->user_id} not found");
+            }
+
+            $paymentTerms = $user->default_payment_terms ?? '30';
+            $paymentDays = $user->getPaymentTermsDays();
+
             $invoice = Invoice::create([
                 'user_id' => $this->user_id,
                 'invoice_number' => Invoice::generateNextNumber($this->user_id),
@@ -151,8 +161,8 @@ class Quote extends Model
                 'customer_phone' => $this->customer_phone,
                 'customer_vat' => $this->customer_vat,
                 'invoice_date' => now(),
-                'due_date' => now()->addDays(30),
-                'payment_terms' => '30',
+                'due_date' => now()->addDays($paymentDays),
+                'payment_terms' => $paymentTerms,
                 'description' => $this->description,
                 'items' => $this->items,
                 'amount' => $this->amount,
@@ -183,6 +193,15 @@ class Quote extends Model
     public static function generateNextNumber(int $userId): string
     {
         return DB::transaction(function () use ($userId) {
+            // Get user's prefix (default: OFF)
+            $user = User::find($userId);
+
+            if (!$user) {
+                throw new \RuntimeException("User with ID {$userId} not found");
+            }
+
+            $prefix = $user->quote_prefix ?? 'OFF';
+
             // Include soft-deleted records to avoid reusing quote numbers
             $lastQuote = self::withTrashed()
                 ->where('user_id', $userId)
@@ -191,11 +210,15 @@ class Quote extends Model
                 ->first();
 
             if (!$lastQuote) {
-                return 'OFF0001';
+                return $prefix . '0001';
             }
 
-            $number = intval(substr($lastQuote->quote_number, 3)) + 1;
-            return 'OFF' . str_pad($number, 4, '0', STR_PAD_LEFT);
+            // Extract numeric part from the end of the quote number
+            preg_match('/(\d+)$/', $lastQuote->quote_number, $matches);
+            $lastNumber = isset($matches[1]) ? intval($matches[1]) : 0;
+            $number = $lastNumber + 1;
+
+            return $prefix . str_pad($number, 4, '0', STR_PAD_LEFT);
         });
     }
 

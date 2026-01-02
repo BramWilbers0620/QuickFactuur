@@ -35,10 +35,12 @@ class QuoteController extends Controller
     {
         $this->ensureUserHasAccess();
 
-        $quoteCount = Quote::where('user_id', auth()->id())->count();
-        $nextQuoteNumber = sprintf('OFF%04d', $quoteCount + 1);
-
         $user = auth()->user();
+
+        // Generate next quote number preview using user's prefix
+        $prefix = $user->quote_prefix ?? 'OFF';
+        $quoteCount = Quote::withTrashed()->where('user_id', $user->id)->count();
+        $nextQuoteNumber = $prefix . sprintf('%04d', $quoteCount + 1);
         $companyProfile = [
             'name' => $user->company_name,
             'address' => $user->company_address,
@@ -85,26 +87,40 @@ class QuoteController extends Controller
             'items.*.quantity' => 'required|integer|min:1|max:10000',
         ]);
 
-        // Handle logo
+        // Handle logo upload - save to disk and convert to base64 for PDF
         $logoData = null;
+        $logoPath = null;
         $logoWarning = null;
 
         if ($request->hasFile('logo')) {
-            if (!extension_loaded('gd')) {
-                $logoWarning = 'Logo kon niet worden verwerkt: GD extensie niet beschikbaar.';
-                Log::warning('Logo processing failed: GD extension not loaded');
-            } else {
-                try {
-                    $file = $request->file('logo');
+            try {
+                $file = $request->file('logo');
+
+                // Validate actual MIME type (not client-provided extension)
+                $actualMimeType = $file->getMimeType();
+                $allowedMimeTypes = ['image/png', 'image/jpeg'];
+
+                if (!in_array($actualMimeType, $allowedMimeTypes)) {
+                    $logoWarning = 'Logo heeft een ongeldig bestandstype. Alleen PNG en JPG zijn toegestaan.';
+                    Log::warning('Logo rejected: invalid MIME type', ['mime' => $actualMimeType]);
+                } else {
+                    // Determine extension from actual MIME type
+                    $extension = $actualMimeType === 'image/png' ? 'png' : 'jpg';
+
+                    // Generate safe filename
+                    $logoFileName = 'logo-' . time() . '-' . bin2hex(random_bytes(4)) . '.' . $extension;
+                    $logoPath = 'logos/' . auth()->id() . '/' . $logoFileName;
+                    Storage::disk('local')->put($logoPath, file_get_contents($file->getRealPath()));
+
+                    // Convert to base64 for PDF generation
                     $imageData = file_get_contents($file->getRealPath());
-                    $extension = strtolower($file->getClientOriginalExtension());
-                    $mimeTypes = ['png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg'];
-                    $mimeType = $mimeTypes[$extension] ?? 'image/png';
-                    $logoData = 'data:' . $mimeType . ';base64,' . base64_encode($imageData);
-                } catch (\Exception $e) {
-                    $logoWarning = 'Logo kon niet worden verwerkt. De offerte is aangemaakt zonder logo.';
-                    Log::warning('Logo processing failed', ['error' => $e->getMessage()]);
+                    $logoData = 'data:' . $actualMimeType . ';base64,' . base64_encode($imageData);
+
+                    Log::info('Logo saved for quote', ['path' => $logoPath, 'user_id' => auth()->id()]);
                 }
+            } catch (\Exception $e) {
+                $logoWarning = 'Logo kon niet worden verwerkt. De offerte is aangemaakt zonder logo.';
+                Log::warning('Logo processing failed', ['error' => $e->getMessage()]);
             }
         }
 
@@ -162,7 +178,7 @@ class QuoteController extends Controller
 
         try {
             // Use transaction to ensure data consistency
-            $result = DB::transaction(function () use ($validated, $processedItems, $subtotal, $vat, $total, $validUntil, &$data, &$quoteNumber) {
+            $result = DB::transaction(function () use ($validated, $processedItems, $subtotal, $vat, $total, $validUntil, $logoPath, &$data, &$quoteNumber) {
                 // Generate quote number with locking to prevent race conditions
                 $quoteNumber = Quote::generateNextNumber(auth()->id());
 
@@ -192,6 +208,7 @@ class QuoteController extends Controller
                     'total' => $total,
                     'notes' => $validated['notes'] ?? null,
                     'brand_color' => $validated['brand_color'],
+                    'logo_path' => $logoPath,
                     'status' => 'concept',
                 ]);
 

@@ -51,9 +51,18 @@ class ProfileController extends Controller
             'company_kvk' => ['nullable', 'string', 'max:20', 'regex:/^(\d{8})?$/'],
             // IBAN format: 2 letters, 2 digits, then alphanumeric (NL91ABNA0417164300)
             'company_iban' => ['nullable', 'string', 'max:34', 'regex:/^([A-Z]{2}\d{2}[A-Z0-9]{1,30})?$/'],
+            // Invoice/quote prefix: 2-10 uppercase letters only
+            'invoice_prefix' => ['nullable', 'string', 'min:2', 'max:10', 'regex:/^[A-Z]+$/'],
+            'quote_prefix' => ['nullable', 'string', 'min:2', 'max:10', 'regex:/^[A-Z]+$/'],
+            // Default payment terms
+            'default_payment_terms' => ['nullable', 'string', 'in:direct,14,30,60'],
         ], [
             'company_kvk.regex' => 'Het KVK-nummer moet uit 8 cijfers bestaan.',
             'company_iban.regex' => 'Voer een geldig IBAN-nummer in (bijv. NL91ABNA0417164300).',
+            'invoice_prefix.regex' => 'De factuur prefix mag alleen hoofdletters bevatten.',
+            'invoice_prefix.min' => 'De factuur prefix moet minimaal 2 tekens zijn.',
+            'quote_prefix.regex' => 'De offerte prefix mag alleen hoofdletters bevatten.',
+            'quote_prefix.min' => 'De offerte prefix moet minimaal 2 tekens zijn.',
         ]);
 
         $request->user()->update($validated);

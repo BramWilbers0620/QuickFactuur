@@ -20,15 +20,42 @@ class InvoiceController extends Controller
     /**
      * Toon lijst van gemaakte facturen.
      */
-    public function index()
+    public function index(Request $request)
     {
         $this->ensureUserHasAccess();
 
-        $invoices = Invoice::where('user_id', auth()->id())
-            ->orderBy('created_at', 'desc')
-            ->paginate(10);
+        $query = Invoice::where('user_id', auth()->id());
 
-        return view('invoice.index', compact('invoices'));
+        // Search by invoice number or customer name
+        if ($search = $request->input('search')) {
+            // Escape LIKE wildcards to prevent unintended pattern matching
+            $escapedSearch = str_replace(['%', '_'], ['\\%', '\\_'], $search);
+            $query->where(function ($q) use ($escapedSearch) {
+                $q->where('invoice_number', 'like', "%{$escapedSearch}%")
+                  ->orWhere('customer_name', 'like', "%{$escapedSearch}%")
+                  ->orWhere('customer_email', 'like', "%{$escapedSearch}%");
+            });
+        }
+
+        // Filter by status
+        if ($status = $request->input('status')) {
+            $query->where('status', $status);
+        }
+
+        // Filter by date range
+        if ($dateFrom = $request->input('date_from')) {
+            $query->where('invoice_date', '>=', $dateFrom);
+        }
+        if ($dateTo = $request->input('date_to')) {
+            $query->where('invoice_date', '<=', $dateTo);
+        }
+
+        $invoices = $query->orderBy('created_at', 'desc')->paginate(10)->withQueryString();
+
+        // Get filter options for the view
+        $statuses = Invoice::$statusLabels;
+
+        return view('invoice.index', compact('invoices', 'statuses'));
     }
 
     /**
@@ -38,12 +65,13 @@ class InvoiceController extends Controller
     {
         $this->ensureUserHasAccess();
 
-        // Generate next invoice number based on user's invoice count
-        $invoiceCount = Invoice::where('user_id', auth()->id())->count();
-        $nextInvoiceNumber = sprintf('FAC%04d', $invoiceCount + 1);
-
         // Get user's company profile for pre-filling
         $user = auth()->user();
+
+        // Generate next invoice number preview using user's prefix
+        $prefix = $user->invoice_prefix ?? 'FAC';
+        $invoiceCount = Invoice::withTrashed()->where('user_id', $user->id)->count();
+        $nextInvoiceNumber = $prefix . sprintf('%04d', $invoiceCount + 1);
         $companyProfile = [
             'name' => $user->company_name,
             'address' => $user->company_address,
@@ -107,34 +135,40 @@ class InvoiceController extends Controller
             'items.*.quantity.required' => 'Vul een aantal in voor elke regel.',
         ]);
 
-        // Handle logo upload - convert to base64 for PDF
-        // Note: Requires PHP GD extension to be enabled
+        // Handle logo upload - save to disk and convert to base64 for PDF
         $logoData = null;
+        $logoPath = null;
         $logoWarning = null;
 
         if ($request->hasFile('logo')) {
-            if (!extension_loaded('gd')) {
-                $logoWarning = 'Logo kon niet worden verwerkt: GD extensie niet beschikbaar.';
-                Log::warning('Logo processing failed: GD extension not loaded');
-            } else {
-                try {
-                    $file = $request->file('logo');
+            try {
+                $file = $request->file('logo');
+
+                // Validate actual MIME type (not client-provided extension)
+                $actualMimeType = $file->getMimeType();
+                $allowedMimeTypes = ['image/png', 'image/jpeg'];
+
+                if (!in_array($actualMimeType, $allowedMimeTypes)) {
+                    $logoWarning = 'Logo heeft een ongeldig bestandstype. Alleen PNG en JPG zijn toegestaan.';
+                    Log::warning('Logo rejected: invalid MIME type', ['mime' => $actualMimeType]);
+                } else {
+                    // Determine extension from actual MIME type
+                    $extension = $actualMimeType === 'image/png' ? 'png' : 'jpg';
+
+                    // Generate safe filename
+                    $logoFileName = 'logo-' . time() . '-' . bin2hex(random_bytes(4)) . '.' . $extension;
+                    $logoPath = 'logos/' . auth()->id() . '/' . $logoFileName;
+                    Storage::disk('local')->put($logoPath, file_get_contents($file->getRealPath()));
+
+                    // Convert to base64 for PDF generation
                     $imageData = file_get_contents($file->getRealPath());
+                    $logoData = 'data:' . $actualMimeType . ';base64,' . base64_encode($imageData);
 
-                    // Determine mime type from extension
-                    $extension = strtolower($file->getClientOriginalExtension());
-                    $mimeTypes = [
-                        'png' => 'image/png',
-                        'jpg' => 'image/jpeg',
-                        'jpeg' => 'image/jpeg',
-                    ];
-                    $mimeType = $mimeTypes[$extension] ?? 'image/png';
-
-                    $logoData = 'data:' . $mimeType . ';base64,' . base64_encode($imageData);
-                } catch (\Exception $e) {
-                    $logoWarning = 'Logo kon niet worden verwerkt. De factuur is aangemaakt zonder logo.';
-                    Log::warning('Logo processing failed', ['error' => $e->getMessage()]);
+                    Log::info('Logo saved', ['path' => $logoPath, 'user_id' => auth()->id()]);
                 }
+            } catch (\Exception $e) {
+                $logoWarning = 'Logo kon niet worden verwerkt. De factuur is aangemaakt zonder logo.';
+                Log::warning('Logo processing failed', ['error' => $e->getMessage()]);
             }
         }
 
@@ -199,7 +233,7 @@ class InvoiceController extends Controller
             $dueDateForDb = Carbon::parse($validated['invoice_date'])->addDays($paymentDays);
 
             // Use transaction to ensure data consistency
-            $result = DB::transaction(function () use ($validated, $processedItems, $subtotal, $vat, $total, $dueDateForDb, $logoData, &$data, &$invoiceNumber) {
+            $result = DB::transaction(function () use ($validated, $processedItems, $subtotal, $vat, $total, $dueDateForDb, $logoData, $logoPath, &$data, &$invoiceNumber) {
                 // Generate invoice number with locking to prevent race conditions
                 $invoiceNumber = Invoice::generateNextNumber(auth()->id());
 
@@ -228,7 +262,10 @@ class InvoiceController extends Controller
                     'amount' => $subtotal,
                     'vat_amount' => $vat,
                     'total' => $total,
+                    'vat_rate' => $validated['vat_rate'],
                     'notes' => $validated['notes'] ?? null,
+                    'brand_color' => $validated['brand_color'],
+                    'logo_path' => $logoPath,
                 ]);
 
                 return $invoice;

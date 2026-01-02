@@ -35,7 +35,9 @@ Route::middleware(['auth', 'subscribed'])->group(function () {
     Route::get('/facturen', [InvoiceController::class, 'index'])->name('invoice.index');
     Route::get('/facturen/nieuw', [InvoiceController::class, 'create'])->name('invoice.create');
     Route::get('/facturen/{invoice}', [InvoiceController::class, 'show'])->name('invoice.show');
-    Route::get('/facturen/{invoice}/download', [InvoiceController::class, 'download'])->name('invoice.download');
+    Route::get('/facturen/{invoice}/download', [InvoiceController::class, 'download'])
+        ->middleware('throttle:30,1')
+        ->name('invoice.download');
 
     // Rate limited routes (prevent abuse)
     Route::post('/facturen/genereren', [InvoiceController::class, 'generate'])
@@ -53,7 +55,9 @@ Route::middleware(['auth', 'subscribed'])->group(function () {
 Route::middleware(['auth', 'subscribed'])->group(function () {
     Route::get('/offertes', [QuoteController::class, 'index'])->name('quotes.index');
     Route::get('/offertes/nieuw', [QuoteController::class, 'create'])->name('quotes.create');
-    Route::get('/offertes/{quote}/download', [QuoteController::class, 'download'])->name('quotes.download');
+    Route::get('/offertes/{quote}/download', [QuoteController::class, 'download'])
+        ->middleware('throttle:30,1')
+        ->name('quotes.download');
 
     // Rate limited routes (prevent abuse)
     Route::post('/offertes/genereren', [QuoteController::class, 'generate'])
