@@ -79,12 +79,25 @@ class DashboardController extends Controller
             ->get();
 
         // Monthly revenue for chart - single query instead of 6
-        $monthlyRevenueData = Invoice::where('user_id', $userId)
-            ->where('invoice_date', '>=', $sixMonthsAgo)
-            ->selectRaw('YEAR(invoice_date) as year, MONTH(invoice_date) as month, SUM(total) as revenue')
-            ->groupByRaw('YEAR(invoice_date), MONTH(invoice_date)')
-            ->get()
-            ->keyBy(fn($item) => $item->year . '-' . str_pad($item->month, 2, '0', STR_PAD_LEFT));
+        // Use database-agnostic date extraction
+        $driver = DB::connection()->getDriverName();
+
+        if ($driver === 'sqlite') {
+            $monthlyRevenueData = Invoice::where('user_id', $userId)
+                ->where('invoice_date', '>=', $sixMonthsAgo)
+                ->selectRaw("strftime('%Y', invoice_date) as year, strftime('%m', invoice_date) as month, SUM(total) as revenue")
+                ->groupByRaw("strftime('%Y', invoice_date), strftime('%m', invoice_date)")
+                ->get()
+                ->keyBy(fn($item) => $item->year . '-' . $item->month);
+        } else {
+            // MySQL / MariaDB / PostgreSQL compatible
+            $monthlyRevenueData = Invoice::where('user_id', $userId)
+                ->where('invoice_date', '>=', $sixMonthsAgo)
+                ->selectRaw('YEAR(invoice_date) as year, MONTH(invoice_date) as month, SUM(total) as revenue')
+                ->groupByRaw('YEAR(invoice_date), MONTH(invoice_date)')
+                ->get()
+                ->keyBy(fn($item) => $item->year . '-' . str_pad($item->month, 2, '0', STR_PAD_LEFT));
+        }
 
         // Build monthly revenue array with all months (including zero months)
         $monthlyRevenue = [];

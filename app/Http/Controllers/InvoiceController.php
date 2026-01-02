@@ -28,10 +28,12 @@ class InvoiceController extends Controller
 
         // Search by invoice number or customer name
         if ($search = $request->input('search')) {
-            $query->where(function ($q) use ($search) {
-                $q->where('invoice_number', 'like', "%{$search}%")
-                  ->orWhere('customer_name', 'like', "%{$search}%")
-                  ->orWhere('customer_email', 'like', "%{$search}%");
+            // Escape LIKE wildcards to prevent unintended pattern matching
+            $escapedSearch = str_replace(['%', '_'], ['\\%', '\\_'], $search);
+            $query->where(function ($q) use ($escapedSearch) {
+                $q->where('invoice_number', 'like', "%{$escapedSearch}%")
+                  ->orWhere('customer_name', 'like', "%{$escapedSearch}%")
+                  ->orWhere('customer_email', 'like', "%{$escapedSearch}%");
             });
         }
 
@@ -63,12 +65,13 @@ class InvoiceController extends Controller
     {
         $this->ensureUserHasAccess();
 
-        // Generate next invoice number based on user's invoice count
-        $invoiceCount = Invoice::where('user_id', auth()->id())->count();
-        $nextInvoiceNumber = sprintf('FAC%04d', $invoiceCount + 1);
-
         // Get user's company profile for pre-filling
         $user = auth()->user();
+
+        // Generate next invoice number preview using user's prefix
+        $prefix = $user->invoice_prefix ?? 'FAC';
+        $invoiceCount = Invoice::withTrashed()->where('user_id', $user->id)->count();
+        $nextInvoiceNumber = $prefix . sprintf('%04d', $invoiceCount + 1);
         $companyProfile = [
             'name' => $user->company_name,
             'address' => $user->company_address,

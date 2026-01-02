@@ -11,10 +11,10 @@ Artisan::command('inspire', function () {
 // Schedule commands
 Schedule::command('invoices:mark-overdue')->dailyAt('08:00');
 
-// Payment reminder emails (sent at 7, 14, and 30 days overdue)
+// Payment reminder emails (staggered to prevent database contention)
 Schedule::command('invoices:send-reminders --days=7')->dailyAt('09:00');
-Schedule::command('invoices:send-reminders --days=14')->dailyAt('09:00');
-Schedule::command('invoices:send-reminders --days=30')->dailyAt('09:00');
+Schedule::command('invoices:send-reminders --days=14')->dailyAt('09:05');
+Schedule::command('invoices:send-reminders --days=30')->dailyAt('09:10');
 
 // Mark expired quotes
 Schedule::command('quotes:expire')->dailyAt('08:00');

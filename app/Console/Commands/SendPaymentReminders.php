@@ -62,7 +62,7 @@ class SendPaymentReminders extends Command
                 Log::info('Payment reminder sent', [
                     'invoice_id' => $invoice->id,
                     'invoice_number' => $invoice->invoice_number,
-                    'customer_email' => $invoice->customer_email,
+                    'customer_email' => substr($invoice->customer_email, 0, 3) . '***',
                     'days_overdue' => $actualDaysOverdue,
                 ]);
 

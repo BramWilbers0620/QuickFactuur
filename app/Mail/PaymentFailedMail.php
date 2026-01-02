@@ -16,6 +16,10 @@ class PaymentFailedMail extends Mailable implements ShouldQueue
 
     /**
      * Create a new message instance.
+     *
+     * @param User $user The user whose payment failed
+     * @param string|null $invoiceId Stripe invoice ID
+     * @param int|null $amount Amount in cents (smallest currency unit)
      */
     public function __construct(
         public User $user,

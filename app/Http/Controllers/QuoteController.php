@@ -35,10 +35,12 @@ class QuoteController extends Controller
     {
         $this->ensureUserHasAccess();
 
-        $quoteCount = Quote::where('user_id', auth()->id())->count();
-        $nextQuoteNumber = sprintf('OFF%04d', $quoteCount + 1);
-
         $user = auth()->user();
+
+        // Generate next quote number preview using user's prefix
+        $prefix = $user->quote_prefix ?? 'OFF';
+        $quoteCount = Quote::withTrashed()->where('user_id', $user->id)->count();
+        $nextQuoteNumber = $prefix . sprintf('%04d', $quoteCount + 1);
         $companyProfile = [
             'name' => $user->company_name,
             'address' => $user->company_address,

@@ -137,6 +137,11 @@ class Quote extends Model
         return DB::transaction(function () {
             // Get user's default payment terms
             $user = User::find($this->user_id);
+
+            if (!$user) {
+                throw new \RuntimeException("User with ID {$this->user_id} not found");
+            }
+
             $paymentTerms = $user->default_payment_terms ?? '30';
             $paymentDays = $user->getPaymentTermsDays();
 
@@ -190,6 +195,11 @@ class Quote extends Model
         return DB::transaction(function () use ($userId) {
             // Get user's prefix (default: OFF)
             $user = User::find($userId);
+
+            if (!$user) {
+                throw new \RuntimeException("User with ID {$userId} not found");
+            }
+
             $prefix = $user->quote_prefix ?? 'OFF';
 
             // Include soft-deleted records to avoid reusing quote numbers

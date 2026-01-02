@@ -44,7 +44,7 @@ class PaymentReminderMail extends Mailable implements ShouldQueue
         $attachments = [];
 
         if ($this->invoice->pdf_path && Storage::disk('local')->exists($this->invoice->pdf_path)) {
-            $attachments[] = Attachment::fromStorage($this->invoice->pdf_path)
+            $attachments[] = Attachment::fromStorageDisk('local', $this->invoice->pdf_path)
                 ->as('factuur-' . $this->invoice->invoice_number . '.pdf')
                 ->withMime('application/pdf');
         }

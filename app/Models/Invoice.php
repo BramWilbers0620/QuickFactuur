@@ -166,6 +166,11 @@ class Invoice extends Model
         return DB::transaction(function () use ($userId) {
             // Get user's prefix (default: FAC)
             $user = User::find($userId);
+
+            if (!$user) {
+                throw new \RuntimeException("User with ID {$userId} not found");
+            }
+
             $prefix = $user->invoice_prefix ?? 'FAC';
 
             // Include soft-deleted records to avoid reusing invoice numbers
