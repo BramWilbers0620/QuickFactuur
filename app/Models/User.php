@@ -30,6 +30,9 @@ class User extends Authenticatable implements MustVerifyEmail
         'company_phone',
         'company_kvk',
         'company_iban',
+        'default_payment_terms',
+        'invoice_prefix',
+        'quote_prefix',
     ];
 
     /**
@@ -88,5 +91,29 @@ class User extends Authenticatable implements MustVerifyEmail
     public function invoices()
     {
         return $this->hasMany(Invoice::class);
+    }
+
+    /**
+     * Get the quotes for the user.
+     */
+    public function quotes()
+    {
+        return $this->hasMany(Quote::class);
+    }
+
+    /**
+     * Get default payment terms in days.
+     */
+    public function getPaymentTermsDays(): int
+    {
+        $terms = $this->default_payment_terms ?? '30';
+        $days = $terms === 'direct' ? 0 : (int) $terms;
+
+        // Validate bounds (max 365 days)
+        if ($days < 0 || $days > 365) {
+            return 30;
+        }
+
+        return $days;
     }
 }

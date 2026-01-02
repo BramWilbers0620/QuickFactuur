@@ -53,6 +53,49 @@
             @enderror
         </div>
 
+        <!-- Divider -->
+        <div class="border-t border-slate-200 pt-5 mt-5">
+            <h3 class="text-sm font-semibold text-slate-900 mb-4">Facturatie Instellingen</h3>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label for="invoice_prefix" class="block text-sm font-medium text-slate-700 mb-2">Factuur Prefix</label>
+                <input type="text" id="invoice_prefix" name="invoice_prefix" value="{{ old('invoice_prefix', $user->invoice_prefix ?? 'FAC') }}"
+                    class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors uppercase"
+                    placeholder="FAC" maxlength="10">
+                <p class="mt-1 text-xs text-slate-500">Bijv. FAC geeft FAC0001, FAC0002, etc.</p>
+                @error('invoice_prefix')
+                    <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                @enderror
+            </div>
+
+            <div>
+                <label for="quote_prefix" class="block text-sm font-medium text-slate-700 mb-2">Offerte Prefix</label>
+                <input type="text" id="quote_prefix" name="quote_prefix" value="{{ old('quote_prefix', $user->quote_prefix ?? 'OFF') }}"
+                    class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors uppercase"
+                    placeholder="OFF" maxlength="10">
+                <p class="mt-1 text-xs text-slate-500">Bijv. OFF geeft OFF0001, OFF0002, etc.</p>
+                @error('quote_prefix')
+                    <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                @enderror
+            </div>
+        </div>
+
+        <div>
+            <label for="default_payment_terms" class="block text-sm font-medium text-slate-700 mb-2">Standaard Betalingstermijn</label>
+            <select id="default_payment_terms" name="default_payment_terms"
+                class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
+                <option value="direct" {{ old('default_payment_terms', $user->default_payment_terms) === 'direct' ? 'selected' : '' }}>Direct</option>
+                <option value="14" {{ old('default_payment_terms', $user->default_payment_terms) === '14' ? 'selected' : '' }}>14 dagen</option>
+                <option value="30" {{ old('default_payment_terms', $user->default_payment_terms ?? '30') === '30' ? 'selected' : '' }}>30 dagen</option>
+                <option value="60" {{ old('default_payment_terms', $user->default_payment_terms) === '60' ? 'selected' : '' }}>60 dagen</option>
+            </select>
+            @error('default_payment_terms')
+                <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+            @enderror
+        </div>
+
         <div class="flex items-center gap-4 pt-4">
             <button type="submit" class="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-lg shadow-blue-200 hover:shadow-xl transition-all duration-200">
                 Opslaan

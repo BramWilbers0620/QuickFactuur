@@ -164,6 +164,10 @@ class Invoice extends Model
     public static function generateNextNumber(int $userId): string
     {
         return DB::transaction(function () use ($userId) {
+            // Get user's prefix (default: FAC)
+            $user = User::find($userId);
+            $prefix = $user->invoice_prefix ?? 'FAC';
+
             // Include soft-deleted records to avoid reusing invoice numbers
             $lastInvoice = self::withTrashed()
                 ->where('user_id', $userId)
@@ -172,11 +176,15 @@ class Invoice extends Model
                 ->first();
 
             if (!$lastInvoice) {
-                return 'FAC0001';
+                return $prefix . '0001';
             }
 
-            $number = intval(substr($lastInvoice->invoice_number, 3)) + 1;
-            return 'FAC' . str_pad($number, 4, '0', STR_PAD_LEFT);
+            // Extract numeric part from the end of the invoice number
+            preg_match('/(\d+)$/', $lastInvoice->invoice_number, $matches);
+            $lastNumber = isset($matches[1]) ? intval($matches[1]) : 0;
+            $number = $lastNumber + 1;
+
+            return $prefix . str_pad($number, 4, '0', STR_PAD_LEFT);
         });
     }
 }
