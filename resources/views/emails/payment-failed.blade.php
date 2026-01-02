@@ -14,7 +14,11 @@
         <p style="margin-bottom: 20px;">Beste {{ $user->name }},</p>
 
         <p style="margin-bottom: 20px;">
-            Helaas is de betaling voor je QuickFactuur abonnement niet gelukt. Dit kan verschillende oorzaken hebben:
+            Helaas is de betaling voor je QuickFactuur abonnement niet gelukt.
+            @if($amount)
+            Het betreft een bedrag van <strong>€{{ number_format($amount / 100, 2, ',', '.') }}</strong>.
+            @endif
+            Dit kan verschillende oorzaken hebben:
         </p>
 
         <ul style="margin-bottom: 20px; padding-left: 20px;">
