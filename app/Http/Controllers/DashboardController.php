@@ -89,8 +89,16 @@ class DashboardController extends Controller
                 ->groupByRaw("strftime('%Y', invoice_date), strftime('%m', invoice_date)")
                 ->get()
                 ->keyBy(fn($item) => $item->year . '-' . $item->month);
+        } elseif ($driver === 'pgsql') {
+            // PostgreSQL uses EXTRACT()
+            $monthlyRevenueData = Invoice::where('user_id', $userId)
+                ->where('invoice_date', '>=', $sixMonthsAgo)
+                ->selectRaw("EXTRACT(YEAR FROM invoice_date)::int as year, EXTRACT(MONTH FROM invoice_date)::int as month, SUM(total) as revenue")
+                ->groupByRaw("EXTRACT(YEAR FROM invoice_date), EXTRACT(MONTH FROM invoice_date)")
+                ->get()
+                ->keyBy(fn($item) => $item->year . '-' . str_pad($item->month, 2, '0', STR_PAD_LEFT));
         } else {
-            // MySQL / MariaDB / PostgreSQL compatible
+            // MySQL / MariaDB
             $monthlyRevenueData = Invoice::where('user_id', $userId)
                 ->where('invoice_date', '>=', $sixMonthsAgo)
                 ->selectRaw('YEAR(invoice_date) as year, MONTH(invoice_date) as month, SUM(total) as revenue')

@@ -50,8 +50,11 @@ class SendPaymentReminders extends Command
 
             $actualDaysOverdue = now()->diffInDays($invoice->due_date);
 
+            // Mask email for console output (privacy)
+            $maskedEmail = substr($invoice->customer_email, 0, 3) . '***';
+
             if ($dryRun) {
-                $this->line("  [DRY RUN] Would send reminder for {$invoice->invoice_number} to {$invoice->customer_email} ({$actualDaysOverdue} days overdue)");
+                $this->line("  [DRY RUN] Would send reminder for {$invoice->invoice_number} to {$maskedEmail} ({$actualDaysOverdue} days overdue)");
                 $sentCount++;
                 continue;
             }
@@ -66,7 +69,7 @@ class SendPaymentReminders extends Command
                     'days_overdue' => $actualDaysOverdue,
                 ]);
 
-                $this->line("  Sent reminder for {$invoice->invoice_number} to {$invoice->customer_email}");
+                $this->line("  Sent reminder for {$invoice->invoice_number} to {$maskedEmail}");
                 $sentCount++;
             } catch (\Exception $e) {
                 Log::error('Payment reminder failed', [
