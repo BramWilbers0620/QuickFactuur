@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -408,6 +409,8 @@ class InvoiceController extends Controller
 
     /**
      * Check if user has active access, redirect to billing if not.
+     *
+     * @throws HttpResponseException
      */
     private function ensureUserHasAccess(): void
     {
@@ -416,7 +419,9 @@ class InvoiceController extends Controller
                 ? 'Je gratis trial is verlopen. Kies een abonnement om facturen aan te maken.'
                 : 'Je hebt een actief abonnement nodig om facturen aan te maken.';
 
-            abort(redirect()->route('billing')->with('error', $errorMessage));
+            throw new HttpResponseException(
+                redirect()->route('billing')->with('error', $errorMessage)
+            );
         }
     }
 }

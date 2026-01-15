@@ -12,52 +12,83 @@ return new class extends Migration
     public function up(): void
     {
         // Add soft deletes to invoices
-        Schema::table('invoices', function (Blueprint $table) {
-            $table->softDeletes();
+        if (!Schema::hasColumn('invoices', 'deleted_at')) {
+            Schema::table('invoices', function (Blueprint $table) {
+                $table->softDeletes();
+            });
+        }
 
-            // Add index on user_id for faster queries
-            $table->index('user_id');
+        // Add indexes to invoices (silently ignore if already exists)
+        $this->addIndexSafely('invoices', 'user_id');
+        $this->addIndexSafely('invoices', 'status');
+        $this->addIndexSafely('invoices', 'due_date');
+        $this->addIndexSafely('invoices', ['status', 'due_date'], 'invoices_status_due_date_index');
 
-            // Add index on status for filtering
-            $table->index('status');
-
-            // Add index on due_date for overdue invoice queries
-            $table->index('due_date');
-
-            // Add composite index for overdue queries (status + due_date)
-            $table->index(['status', 'due_date']);
-
-            // Add composite unique constraint for invoice numbers per user
-            // First drop the global unique constraint
-            $table->dropUnique(['invoice_number']);
-            $table->unique(['user_id', 'invoice_number']);
-        });
+        // Handle unique constraint change for invoices
+        $this->dropUniqueSafely('invoices', 'invoice_number');
+        $this->addUniqueSafely('invoices', ['user_id', 'invoice_number']);
 
         // Add soft deletes to quotes
-        Schema::table('quotes', function (Blueprint $table) {
-            $table->softDeletes();
+        if (!Schema::hasColumn('quotes', 'deleted_at')) {
+            Schema::table('quotes', function (Blueprint $table) {
+                $table->softDeletes();
+            });
+        }
 
-            // Add index on user_id for faster queries
-            $table->index('user_id');
+        // Add indexes to quotes
+        $this->addIndexSafely('quotes', 'user_id');
+        $this->addIndexSafely('quotes', 'valid_until');
+        $this->addIndexSafely('quotes', 'status');
 
-            // Add index on valid_until for expired quote queries
-            $table->index('valid_until');
-
-            // Add index on status for filtering
-            $table->index('status');
-
-            // Add composite unique constraint for quote numbers per user
-            $table->dropUnique(['quote_number']);
-            $table->unique(['user_id', 'quote_number']);
-        });
+        // Handle unique constraint change for quotes
+        $this->dropUniqueSafely('quotes', 'quote_number');
+        $this->addUniqueSafely('quotes', ['user_id', 'quote_number']);
 
         // Add soft deletes to customers
-        Schema::table('customers', function (Blueprint $table) {
-            $table->softDeletes();
+        if (!Schema::hasColumn('customers', 'deleted_at')) {
+            Schema::table('customers', function (Blueprint $table) {
+                $table->softDeletes();
+            });
+        }
 
-            // Add index on user_id for faster queries
-            $table->index('user_id');
-        });
+        $this->addIndexSafely('customers', 'user_id');
+    }
+
+    private function addIndexSafely(string $table, string|array $columns, ?string $name = null): void
+    {
+        try {
+            Schema::table($table, function (Blueprint $t) use ($columns, $name) {
+                if ($name) {
+                    $t->index($columns, $name);
+                } else {
+                    $t->index($columns);
+                }
+            });
+        } catch (\Exception $e) {
+            // Index already exists, ignore
+        }
+    }
+
+    private function addUniqueSafely(string $table, array $columns): void
+    {
+        try {
+            Schema::table($table, function (Blueprint $t) use ($columns) {
+                $t->unique($columns);
+            });
+        } catch (\Exception $e) {
+            // Unique constraint already exists, ignore
+        }
+    }
+
+    private function dropUniqueSafely(string $table, string $column): void
+    {
+        try {
+            Schema::table($table, function (Blueprint $t) use ($column) {
+                $t->dropUnique([$column]);
+            });
+        } catch (\Exception $e) {
+            // Unique constraint doesn't exist, ignore
+        }
     }
 
     /**

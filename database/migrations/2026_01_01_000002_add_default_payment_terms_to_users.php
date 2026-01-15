@@ -12,9 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->string('default_payment_terms', 10)->default('30')->after('company_iban');
-            $table->string('invoice_prefix', 10)->default('FAC')->after('default_payment_terms');
-            $table->string('quote_prefix', 10)->default('OFF')->after('invoice_prefix');
+            $table->string('default_payment_terms', 10)->nullable()->default('30')->after('company_iban');
+            $table->string('invoice_prefix', 10)->nullable()->default('FAC')->after('default_payment_terms');
+            $table->string('quote_prefix', 10)->nullable()->default('OFF')->after('invoice_prefix');
         });
     }
 

@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Enums\InvoiceStatus;
+use App\Enums\QuoteStatus;
+use App\Models\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,7 +13,18 @@ use Illuminate\Support\Facades\DB;
 
 class Quote extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, Auditable;
+
+    /**
+     * Fields to exclude from audit logging.
+     */
+    protected array $auditExcluded = [
+        'created_at',
+        'updated_at',
+        'deleted_at',
+        'pdf_path',
+        'logo_path',
+    ];
 
     protected $fillable = [
         'user_id',
@@ -59,6 +73,7 @@ class Quote extends Model
 
     /**
      * Status labels in Dutch.
+     * @deprecated Use QuoteStatus enum instead
      */
     public static array $statusLabels = [
         'concept' => 'Concept',
@@ -70,6 +85,7 @@ class Quote extends Model
 
     /**
      * Status colors for badges.
+     * @deprecated Use QuoteStatus enum instead
      */
     public static array $statusColors = [
         'concept' => 'bg-slate-100 text-slate-700 border-slate-200',
@@ -80,11 +96,19 @@ class Quote extends Model
     ];
 
     /**
+     * Get status as enum.
+     */
+    public function getStatusEnumAttribute(): ?QuoteStatus
+    {
+        return QuoteStatus::tryFrom($this->status);
+    }
+
+    /**
      * Get status label.
      */
     public function getStatusLabelAttribute(): string
     {
-        return self::$statusLabels[$this->status] ?? $this->status;
+        return $this->status_enum?->label() ?? $this->status;
     }
 
     /**
@@ -124,7 +148,13 @@ class Quote extends Model
      */
     public function canConvertToInvoice(): bool
     {
-        return in_array($this->status, ['concept', 'verzonden', 'geaccepteerd'])
+        $convertableStatuses = [
+            QuoteStatus::CONCEPT->value,
+            QuoteStatus::SENT->value,
+            QuoteStatus::ACCEPTED->value,
+        ];
+
+        return in_array($this->status, $convertableStatuses)
             && !$this->converted_invoice_id;
     }
 
@@ -173,11 +203,11 @@ class Quote extends Model
                 'template' => $this->template,
                 'brand_color' => $this->brand_color,
                 'logo_path' => $this->logo_path,
-                'status' => 'concept',
+                'status' => InvoiceStatus::CONCEPT->value,
             ]);
 
             $this->update([
-                'status' => 'geaccepteerd',
+                'status' => QuoteStatus::ACCEPTED->value,
                 'accepted_at' => now(),
                 'converted_invoice_id' => $invoice->id,
             ]);

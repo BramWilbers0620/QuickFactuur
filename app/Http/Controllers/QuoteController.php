@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
@@ -310,11 +311,15 @@ class QuoteController extends Controller
 
     /**
      * Check if user has active access.
+     *
+     * @throws HttpResponseException
      */
     private function ensureUserHasAccess(): void
     {
         if (!auth()->user()->hasActiveAccess()) {
-            abort(redirect()->route('billing')->with('error', 'Je hebt een actief abonnement nodig.'));
+            throw new HttpResponseException(
+                redirect()->route('billing')->with('error', 'Je hebt een actief abonnement nodig.')
+            );
         }
     }
 }
