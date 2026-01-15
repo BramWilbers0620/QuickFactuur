@@ -109,7 +109,8 @@ class InvoiceController extends Controller
             'company_address' => 'required|string|max:255',
             'company_phone' => 'nullable|string|max:50',
             'company_kvk' => 'nullable|string|max:20',
-            'company_btw' => 'nullable|string|max:20',
+            // Dutch BTW number format: NL + 9 digits + B + 2 digits (e.g., NL123456789B01)
+            'company_btw' => ['nullable', 'string', 'max:20', 'regex:/^(NL\d{9}B\d{2})?$/i'],
             'company_iban' => 'nullable|string|max:50',
 
             // Customer fields
