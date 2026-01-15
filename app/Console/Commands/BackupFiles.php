@@ -97,7 +97,6 @@ class BackupFiles extends Command
 
         // Create zip in temp location first
         $tempZipPath = storage_path("app/{$backupDir}/temp_{$timestamp}.zip");
-        $finalPath = storage_path("app/{$backupPath}");
 
         $zip = new ZipArchive();
 

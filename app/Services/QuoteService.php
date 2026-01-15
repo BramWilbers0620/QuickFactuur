@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\QuoteStatus;
 use App\Models\Quote;
 use App\Models\Invoice;
 use App\Models\User;
@@ -186,9 +187,14 @@ class QuoteService
      * @param Quote $quote
      * @param string $status
      * @return Quote
+     * @throws \InvalidArgumentException If status is invalid
      */
     public function updateStatus(Quote $quote, string $status): Quote
     {
+        if (!in_array($status, QuoteStatus::values())) {
+            throw new \InvalidArgumentException("Invalid quote status: {$status}");
+        }
+
         $quote->update(['status' => $status]);
         return $quote->fresh();
     }

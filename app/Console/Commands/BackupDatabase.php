@@ -114,18 +114,23 @@ class BackupDatabase extends Command
         // Ensure directory exists
         Storage::disk('local')->makeDirectory($backupDir);
 
+        // Set password via environment variable for security (avoids exposure in process listings)
+        putenv("MYSQL_PWD={$config['password']}");
+
         // Build mysqldump command
         $command = sprintf(
-            'mysqldump --host=%s --port=%s --user=%s --password=%s %s > %s',
+            'mysqldump --host=%s --port=%s --user=%s %s > %s',
             escapeshellarg($config['host']),
             escapeshellarg($config['port']),
             escapeshellarg($config['username']),
-            escapeshellarg($config['password']),
             escapeshellarg($config['database']),
             escapeshellarg($tempFile)
         );
 
         exec($command . ' 2>&1', $output, $returnCode);
+
+        // Clear password from environment
+        putenv('MYSQL_PWD');
 
         if ($returnCode !== 0) {
             @unlink($tempFile);

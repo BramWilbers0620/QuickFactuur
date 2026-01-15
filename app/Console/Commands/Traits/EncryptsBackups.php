@@ -49,7 +49,7 @@ trait EncryptsBackups
         }
 
         // Prepend IV and tag to encrypted data
-        // Format: [16 bytes IV][16 bytes tag][encrypted data]
+        // Format: [12 bytes IV][16 bytes tag][encrypted data]
         return $iv . $tag . $encrypted;
     }
 

@@ -73,7 +73,7 @@ enum QuoteStatus: string
      */
     public function canConvert(): bool
     {
-        return $this === self::ACCEPTED;
+        return in_array($this, [self::CONCEPT, self::SENT, self::ACCEPTED]);
     }
 
     /**
