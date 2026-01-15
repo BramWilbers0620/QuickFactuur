@@ -196,13 +196,6 @@
                                        class="w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                                        placeholder="12345678">
                             </div>
-
-                            <div>
-                                <label for="company_iban" class="block text-sm font-medium text-slate-600 mb-1.5">IBAN</label>
-                                <input type="text" id="company_iban" name="company_iban" value="{{ old('company_iban', $companyProfile['iban'] ?? '') }}"
-                                       class="w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                                       placeholder="NL00 BANK 0123 4567 89">
-                            </div>
                         </div>
 
                         <!-- Rekening naar (Klantgegevens) -->
@@ -354,9 +347,9 @@
                                 <div class="md:col-span-2">
                                     <label class="md:hidden text-xs font-medium text-slate-500 mb-1 block">Prijs</label>
                                     <div class="relative">
-                                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">€</span>
+                                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm leading-none">€</span>
                                         <input type="number" name="items[0][rate]" step="0.01" min="0" placeholder="0.00"
-                                               class="item-rate w-full border border-slate-200 rounded-lg pl-7 pr-3 py-2 text-sm text-right focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
+                                               class="item-rate w-full border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-sm text-right focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
                                     </div>
                                 </div>
                                 <div class="md:col-span-2">
@@ -408,8 +401,8 @@
                     <!-- Action Buttons -->
                     <div class="flex flex-col sm:flex-row gap-4 pt-6 border-t border-slate-100">
                         <button type="submit" id="submit-btn"
-                                class="flex-1 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 shadow-lg shadow-emerald-200 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center group">
-                            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden" id="submit-spinner" fill="none" viewBox="0 0 24 24">
+                                class="flex-1 bg-white hover:bg-slate-200 text-slate-800 font-semibold py-4 px-6 rounded-xl transition-all duration-200 shadow-lg shadow-slate-200 hover:shadow-xl border-2 border-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center group">
+                            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-slate-800 hidden" id="submit-spinner" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
@@ -533,9 +526,9 @@
                 <div class="md:col-span-2">
                     <label class="md:hidden text-xs font-medium text-slate-500 mb-1 block">Prijs</label>
                     <div class="relative">
-                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">€</span>
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm leading-none">€</span>
                         <input type="number" name="items[${rowIndex}][rate]" step="0.01" min="0" placeholder="0.00"
-                               class="item-rate w-full border border-slate-200 rounded-lg pl-7 pr-3 py-2 text-sm text-right focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
+                               class="item-rate w-full border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-sm text-right focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
                     </div>
                 </div>
                 <div class="md:col-span-2">

@@ -354,9 +354,9 @@
                                 <div class="md:col-span-2">
                                     <label class="md:hidden text-xs font-medium text-slate-500 mb-1 block">Prijs</label>
                                     <div class="relative">
-                                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">€</span>
+                                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm leading-none">€</span>
                                         <input type="number" name="items[0][rate]" step="0.01" min="0" placeholder="0.00"
-                                               class="item-rate w-full border border-slate-200 rounded-lg pl-7 pr-3 py-2 text-sm text-right focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
+                                               class="item-rate w-full border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-sm text-right focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
                                     </div>
                                 </div>
                                 <div class="md:col-span-2">
@@ -533,9 +533,9 @@
                 <div class="md:col-span-2">
                     <label class="md:hidden text-xs font-medium text-slate-500 mb-1 block">Prijs</label>
                     <div class="relative">
-                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">€</span>
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm leading-none">€</span>
                         <input type="number" name="items[${rowIndex}][rate]" step="0.01" min="0" placeholder="0.00"
-                               class="item-rate w-full border border-slate-200 rounded-lg pl-7 pr-3 py-2 text-sm text-right focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
+                               class="item-rate w-full border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-sm text-right focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
                     </div>
                 </div>
                 <div class="md:col-span-2">
