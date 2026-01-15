@@ -14,8 +14,10 @@ class ExpireQuotes extends Command
 
     public function handle(): int
     {
+        // Only expire quotes that have been sent to the customer
+        // Concept quotes are drafts that shouldn't expire
         $count = Quote::where('valid_until', '<', now())
-            ->whereNotIn('status', ['verlopen', 'geaccepteerd', 'afgewezen'])
+            ->whereNotIn('status', ['concept', 'verlopen', 'geaccepteerd', 'afgewezen'])
             ->update(['status' => 'verlopen']);
 
         if ($count > 0) {

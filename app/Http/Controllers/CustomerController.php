@@ -12,11 +12,20 @@ class CustomerController extends Controller
     /**
      * Display a listing of the customers.
      */
-    public function index(): View
+    public function index(Request $request): View
     {
-        $customers = Customer::where('user_id', auth()->id())
-            ->orderBy('name')
-            ->paginate(10);
+        $query = Customer::where('user_id', auth()->id());
+
+        // Search by name or email
+        if ($search = $request->input('search')) {
+            $escapedSearch = str_replace(['%', '_'], ['\\%', '\\_'], $search);
+            $query->where(function ($q) use ($escapedSearch) {
+                $q->where('name', 'like', "%{$escapedSearch}%")
+                  ->orWhere('email', 'like', "%{$escapedSearch}%");
+            });
+        }
+
+        $customers = $query->orderBy('name')->paginate(10)->withQueryString();
 
         return view('customers.index', compact('customers'));
     }

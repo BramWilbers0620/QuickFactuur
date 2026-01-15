@@ -23,7 +23,8 @@ class MarkOverdueInvoices extends Command
      */
     public function handle(): int
     {
-        $count = Invoice::whereIn('status', ['concept', 'verzonden'])
+        // Only mark 'verzonden' invoices as overdue - concept invoices haven't been sent yet
+        $count = Invoice::where('status', 'verzonden')
             ->whereNotNull('due_date')
             ->where('due_date', '<', now())
             ->update(['status' => 'te_laat']);

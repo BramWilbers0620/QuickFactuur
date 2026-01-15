@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Commands\Traits\EncryptsBackups;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
@@ -9,17 +10,27 @@ use ZipArchive;
 
 class BackupFiles extends Command
 {
-    protected $signature = 'backup:files
-                            {--disk=local : Storage disk to backup from}';
+    use EncryptsBackups;
 
-    protected $description = 'Create a backup of uploaded files (invoices, logos)';
+    protected $signature = 'backup:files
+                            {--disk=local : Storage disk to backup from}
+                            {--no-encrypt : Disable encryption even if enabled in config}';
+
+    protected $description = 'Create an encrypted backup of uploaded files (invoices, logos)';
 
     public function handle(): int
     {
         $disk = $this->option('disk');
         $timestamp = now()->format('Y-m-d_H-i-s');
+        $shouldEncrypt = $this->isEncryptionEnabled() && !$this->option('no-encrypt');
 
         $this->info('Starting file backup...');
+
+        if ($shouldEncrypt) {
+            $this->info('Encryption: enabled');
+        } else {
+            $this->warn('Encryption: disabled');
+        }
 
         // Directories to backup
         $directories = ['invoices', 'logos', 'quotes'];
@@ -43,7 +54,7 @@ class BackupFiles extends Command
         $this->info("Backing up " . count($filesToBackup) . " files...");
 
         try {
-            $backupPath = $this->createZipBackup($filesToBackup, $timestamp, $disk);
+            $backupPath = $this->createZipBackup($filesToBackup, $timestamp, $disk, $shouldEncrypt);
 
             if (!$backupPath) {
                 $this->error('Backup failed.');
@@ -58,6 +69,7 @@ class BackupFiles extends Command
                 'path' => $backupPath,
                 'size' => $sizeFormatted,
                 'file_count' => count($filesToBackup),
+                'encrypted' => $shouldEncrypt,
             ]);
 
             $this->info("Backup created: {$backupPath} ({$sizeFormatted})");
@@ -73,21 +85,24 @@ class BackupFiles extends Command
         }
     }
 
-    private function createZipBackup(array $files, string $timestamp, string $disk): ?string
+    private function createZipBackup(array $files, string $timestamp, string $disk, bool $encrypt): ?string
     {
-        $backupFileName = "files_backup_{$timestamp}.zip";
-        $backupDir = 'backups/files';
+        $extension = $encrypt ? '.zip' . $this->getEncryptedExtension() : '.zip';
+        $backupFileName = "files_backup_{$timestamp}{$extension}";
+        $backupDir = config('backup.paths.files', 'backups/files');
         $backupPath = "{$backupDir}/{$backupFileName}";
 
         // Ensure backup directory exists
         Storage::disk($disk)->makeDirectory($backupDir);
 
-        $zipPath = storage_path("app/{$backupPath}");
+        // Create zip in temp location first
+        $tempZipPath = storage_path("app/{$backupDir}/temp_{$timestamp}.zip");
+        $finalPath = storage_path("app/{$backupPath}");
 
         $zip = new ZipArchive();
 
-        if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-            throw new \RuntimeException("Cannot create zip file: {$zipPath}");
+        if ($zip->open($tempZipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            throw new \RuntimeException("Cannot create zip file: {$tempZipPath}");
         }
 
         $addedCount = 0;
@@ -103,6 +118,17 @@ class BackupFiles extends Command
         $zip->close();
 
         $this->line("  Added {$addedCount} files to archive.");
+
+        // Read the zip and optionally encrypt
+        $content = file_get_contents($tempZipPath);
+        @unlink($tempZipPath);
+
+        if ($encrypt) {
+            $this->line('  Encrypting backup...');
+            $content = $this->encryptData($content);
+        }
+
+        Storage::disk($disk)->put($backupPath, $content);
 
         return $backupPath;
     }

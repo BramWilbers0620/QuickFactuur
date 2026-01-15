@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\InvoiceStatus;
+use App\Models\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,7 +12,18 @@ use Illuminate\Support\Facades\DB;
 
 class Invoice extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, Auditable;
+
+    /**
+     * Fields to exclude from audit logging.
+     */
+    protected array $auditExcluded = [
+        'created_at',
+        'updated_at',
+        'deleted_at',
+        'pdf_path',
+        'logo_path',
+    ];
 
     protected $fillable = [
         'user_id',
@@ -59,6 +72,7 @@ class Invoice extends Model
 
     /**
      * Status labels in Dutch.
+     * @deprecated Use InvoiceStatus enum instead
      */
     public static array $statusLabels = [
         'concept' => 'Concept',
@@ -69,6 +83,7 @@ class Invoice extends Model
 
     /**
      * Status colors for badges.
+     * @deprecated Use InvoiceStatus enum instead
      */
     public static array $statusColors = [
         'concept' => 'bg-slate-100 text-slate-700 border-slate-200',
@@ -78,11 +93,19 @@ class Invoice extends Model
     ];
 
     /**
+     * Get status as enum.
+     */
+    public function getStatusEnumAttribute(): ?InvoiceStatus
+    {
+        return InvoiceStatus::tryFrom($this->status);
+    }
+
+    /**
      * Get status label.
      */
     public function getStatusLabelAttribute(): string
     {
-        return self::$statusLabels[$this->status] ?? $this->status;
+        return $this->status_enum?->label() ?? $this->status;
     }
 
     /**
@@ -98,7 +121,7 @@ class Invoice extends Model
      */
     public function isOverdue(): bool
     {
-        return $this->status !== 'betaald'
+        return $this->status !== InvoiceStatus::PAID->value
             && $this->due_date
             && $this->due_date->isPast();
     }
@@ -109,7 +132,7 @@ class Invoice extends Model
     public function markAsSent(): void
     {
         $this->update([
-            'status' => 'verzonden',
+            'status' => InvoiceStatus::SENT->value,
             'sent_at' => now(),
         ]);
     }
@@ -120,7 +143,7 @@ class Invoice extends Model
     public function markAsPaid(): void
     {
         $this->update([
-            'status' => 'betaald',
+            'status' => InvoiceStatus::PAID->value,
             'paid_at' => now(),
         ]);
     }
