@@ -142,10 +142,11 @@
                     @if($company['email']){{ $company['email'] }}<br>@endif
                     @if($company['phone']){{ $company['phone'] }}<br>@endif
                 </div>
+                @if($company['kvk'])
                 <div class="contact-info mt-2">
-                    @if($company['kvk'])KvK: {{ $company['kvk'] }}<br>@endif
-                    @if($company['iban'])IBAN: {{ $company['iban'] }}@endif
+                    KvK: {{ $company['kvk'] }}
                 </div>
+                @endif
             </td>
         </tr>
     </table>
@@ -231,12 +232,18 @@
     </div>
     @endif
 
-    {{-- Validity Info --}}
+    {{-- Validity Info & Call to Action --}}
     <div class="validity-info">
-        <div class="bold mb-1" style="color: #059669;">Geldigheid offerte</div>
+        <div class="bold mb-1" style="color: #059669;">Offerte accepteren</div>
         <div class="contact-info">
-            Deze offerte is geldig tot <strong>{{ $valid_until }}</strong>.<br>
-            Heeft u vragen of wilt u akkoord gaan? Neem dan contact met ons op.
+            Deze offerte is geldig tot <strong>{{ $valid_until }}</strong>.<br><br>
+            <strong>Akkoord gaan met deze offerte?</strong><br>
+            Stuur een e-mail naar <strong>{{ $company['email'] }}</strong> met vermelding van offertenummer <strong>{{ $quote_number }}</strong>.
+            @if($company['phone'])
+            <br>Of bel ons op <strong>{{ $company['phone'] }}</strong>.
+            @endif
+            <br><br>
+            <em>Na akkoord ontvangt u een factuur voor de overeengekomen werkzaamheden.</em>
         </div>
     </div>
 

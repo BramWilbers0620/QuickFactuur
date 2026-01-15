@@ -47,17 +47,18 @@ class DashboardController extends Controller
         $sixMonthsAgo = $now->copy()->subMonths(5)->startOfMonth();
 
         // Single optimized query for all invoice statistics
+        // Revenue is only counted for PAID invoices (status = 'betaald')
         $invoiceStats = Invoice::where('user_id', $userId)
             ->selectRaw('
                 COUNT(*) as total_count,
-                SUM(total) as total_revenue,
+                SUM(CASE WHEN status = ? THEN total ELSE 0 END) as total_revenue,
                 SUM(CASE WHEN invoice_date >= ? THEN 1 ELSE 0 END) as month_count,
-                SUM(CASE WHEN invoice_date >= ? THEN total ELSE 0 END) as month_revenue,
-                SUM(CASE WHEN invoice_date >= ? THEN total ELSE 0 END) as year_revenue,
+                SUM(CASE WHEN status = ? AND invoice_date >= ? THEN total ELSE 0 END) as month_revenue,
+                SUM(CASE WHEN status = ? AND invoice_date >= ? THEN total ELSE 0 END) as year_revenue,
                 SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as paid_count,
                 SUM(CASE WHEN status IN (?, ?) THEN 1 ELSE 0 END) as pending_count,
                 SUM(CASE WHEN status != ? AND due_date IS NOT NULL AND due_date < ? THEN 1 ELSE 0 END) as overdue_count
-            ', [$startOfMonth, $startOfMonth, $startOfYear, 'betaald', 'concept', 'verzonden', 'betaald', $now])
+            ', ['betaald', $startOfMonth, 'betaald', $startOfMonth, 'betaald', $startOfYear, 'betaald', 'concept', 'verzonden', 'betaald', $now])
             ->first();
 
         // Single optimized query for all quote statistics
@@ -82,9 +83,11 @@ class DashboardController extends Controller
         // Use database-agnostic date extraction
         $driver = DB::connection()->getDriverName();
 
+        // Monthly revenue chart - only count PAID invoices
         if ($driver === 'sqlite') {
             $monthlyRevenueData = Invoice::where('user_id', $userId)
                 ->where('invoice_date', '>=', $sixMonthsAgo)
+                ->where('status', 'betaald')
                 ->selectRaw("strftime('%Y', invoice_date) as year, strftime('%m', invoice_date) as month, SUM(total) as revenue")
                 ->groupByRaw("strftime('%Y', invoice_date), strftime('%m', invoice_date)")
                 ->get()
@@ -93,6 +96,7 @@ class DashboardController extends Controller
             // PostgreSQL uses EXTRACT()
             $monthlyRevenueData = Invoice::where('user_id', $userId)
                 ->where('invoice_date', '>=', $sixMonthsAgo)
+                ->where('status', 'betaald')
                 ->selectRaw("EXTRACT(YEAR FROM invoice_date)::int as year, EXTRACT(MONTH FROM invoice_date)::int as month, SUM(total) as revenue")
                 ->groupByRaw("EXTRACT(YEAR FROM invoice_date), EXTRACT(MONTH FROM invoice_date)")
                 ->get()
@@ -101,6 +105,7 @@ class DashboardController extends Controller
             // MySQL / MariaDB
             $monthlyRevenueData = Invoice::where('user_id', $userId)
                 ->where('invoice_date', '>=', $sixMonthsAgo)
+                ->where('status', 'betaald')
                 ->selectRaw('YEAR(invoice_date) as year, MONTH(invoice_date) as month, SUM(total) as revenue')
                 ->groupByRaw('YEAR(invoice_date), MONTH(invoice_date)')
                 ->get()

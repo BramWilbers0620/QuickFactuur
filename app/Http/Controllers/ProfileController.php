@@ -49,6 +49,8 @@ class ProfileController extends Controller
             'company_phone' => 'nullable|string|max:50',
             // Dutch KVK number is exactly 8 digits
             'company_kvk' => ['nullable', 'string', 'max:20', 'regex:/^(\d{8})?$/'],
+            // Dutch BTW number format: NL + 9 digits + B + 2 digits (NL123456789B01)
+            'company_btw' => ['nullable', 'string', 'max:20', 'regex:/^(NL\d{9}B\d{2})?$/i'],
             // IBAN format: 2 letters, 2 digits, then alphanumeric (NL91ABNA0417164300)
             'company_iban' => ['nullable', 'string', 'max:34', 'regex:/^([A-Z]{2}\d{2}[A-Z0-9]{1,30})?$/'],
             // Invoice/quote prefix: 2-10 uppercase letters only
@@ -58,6 +60,7 @@ class ProfileController extends Controller
             'default_payment_terms' => ['nullable', 'string', 'in:direct,14,30,60'],
         ], [
             'company_kvk.regex' => 'Het KVK-nummer moet uit 8 cijfers bestaan.',
+            'company_btw.regex' => 'Voer een geldig BTW-nummer in (bijv. NL123456789B01).',
             'company_iban.regex' => 'Voer een geldig IBAN-nummer in (bijv. NL91ABNA0417164300).',
             'invoice_prefix.regex' => 'De factuur prefix mag alleen hoofdletters bevatten.',
             'invoice_prefix.min' => 'De factuur prefix moet minimaal 2 tekens zijn.',
