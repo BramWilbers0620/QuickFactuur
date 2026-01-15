@@ -170,6 +170,9 @@
                     @if($company['kvk'])
                         KvK: {{ $company['kvk'] }}<br>
                     @endif
+                    @if($company['btw'])
+                        BTW: {{ $company['btw'] }}<br>
+                    @endif
                     @if($company['iban'])
                         IBAN: {{ $company['iban'] }}
                     @endif
