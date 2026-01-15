@@ -11,6 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Skip if columns already exist (created in initial migration)
+        if (Schema::hasColumn('invoices', 'company_email')) {
+            return;
+        }
+
         Schema::table('invoices', function (Blueprint $table) {
             // Company extra fields
             $table->string('company_email')->nullable()->after('company_address');

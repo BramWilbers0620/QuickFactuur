@@ -18,3 +18,10 @@ Schedule::command('invoices:send-reminders --days=30')->dailyAt('09:10');
 
 // Mark expired quotes
 Schedule::command('quotes:expire')->dailyAt('08:00');
+
+// Backups (run at night when traffic is low)
+Schedule::command('backup:database')->dailyAt('03:00');
+Schedule::command('backup:files')->dailyAt('03:30');
+
+// Cleanup old backups weekly (keep 30 days)
+Schedule::command('backup:cleanup --days=30')->weeklyOn(0, '04:00');
