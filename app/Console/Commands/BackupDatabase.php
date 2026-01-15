@@ -35,9 +35,9 @@ class BackupDatabase extends Command
 
         try {
             $backupPath = match ($driver) {
-                'sqlite' => $this->backupSqlite($timestamp, $shouldEncrypt),
-                'mysql', 'mariadb' => $this->backupMysql($timestamp, $shouldEncrypt),
-                'pgsql' => $this->backupPostgres($timestamp, $shouldEncrypt),
+                'sqlite' => $this->backupSqlite($timestamp, $shouldEncrypt, $disk),
+                'mysql', 'mariadb' => $this->backupMysql($timestamp, $shouldEncrypt, $disk),
+                'pgsql' => $this->backupPostgres($timestamp, $shouldEncrypt, $disk),
                 default => throw new \RuntimeException("Unsupported database driver: {$driver}"),
             };
 
@@ -71,7 +71,7 @@ class BackupDatabase extends Command
         }
     }
 
-    private function backupSqlite(string $timestamp, bool $encrypt): ?string
+    private function backupSqlite(string $timestamp, bool $encrypt, string $disk): ?string
     {
         $dbPath = config('database.connections.sqlite.database');
 
@@ -84,7 +84,7 @@ class BackupDatabase extends Command
         $backupPath = config('backup.paths.database', 'backups/database') . "/{$backupFileName}";
 
         // Ensure directory exists
-        Storage::disk('local')->makeDirectory(config('backup.paths.database', 'backups/database'));
+        Storage::disk($disk)->makeDirectory(config('backup.paths.database', 'backups/database'));
 
         // Read the SQLite file
         $content = file_get_contents($dbPath);
@@ -94,12 +94,12 @@ class BackupDatabase extends Command
             $content = $this->encryptData($content);
         }
 
-        Storage::disk('local')->put($backupPath, $content);
+        Storage::disk($disk)->put($backupPath, $content);
 
         return $backupPath;
     }
 
-    private function backupMysql(string $timestamp, bool $encrypt): ?string
+    private function backupMysql(string $timestamp, bool $encrypt, string $disk): ?string
     {
         $config = config('database.connections.mysql');
         $extension = $encrypt ? '.sql' . $this->getEncryptedExtension() : '.sql';
@@ -107,12 +107,15 @@ class BackupDatabase extends Command
         $backupDir = config('backup.paths.database', 'backups/database');
         $backupPath = "{$backupDir}/{$backupFileName}";
 
-        // Use a temp file without encryption extension for mysqldump
+        // Use a temp file without encryption extension for mysqldump (always local for shell command)
         $tempFileName = "backup_{$timestamp}.sql.tmp";
         $tempFile = storage_path("app/{$backupDir}/{$tempFileName}");
 
-        // Ensure directory exists
+        // Ensure local temp directory exists
         Storage::disk('local')->makeDirectory($backupDir);
+
+        // Ensure target directory exists on target disk
+        Storage::disk($disk)->makeDirectory($backupDir);
 
         // Set password via environment variable for security (avoids exposure in process listings)
         putenv("MYSQL_PWD={$config['password']}");
@@ -145,12 +148,12 @@ class BackupDatabase extends Command
             $content = $this->encryptData($content);
         }
 
-        Storage::disk('local')->put($backupPath, $content);
+        Storage::disk($disk)->put($backupPath, $content);
 
         return $backupPath;
     }
 
-    private function backupPostgres(string $timestamp, bool $encrypt): ?string
+    private function backupPostgres(string $timestamp, bool $encrypt, string $disk): ?string
     {
         $config = config('database.connections.pgsql');
         $extension = $encrypt ? '.sql' . $this->getEncryptedExtension() : '.sql';
@@ -158,12 +161,15 @@ class BackupDatabase extends Command
         $backupDir = config('backup.paths.database', 'backups/database');
         $backupPath = "{$backupDir}/{$backupFileName}";
 
-        // Use a temp file for pg_dump
+        // Use a temp file for pg_dump (always local for shell command)
         $tempFileName = "backup_{$timestamp}.sql.tmp";
         $tempFile = storage_path("app/{$backupDir}/{$tempFileName}");
 
-        // Ensure directory exists
+        // Ensure local temp directory exists
         Storage::disk('local')->makeDirectory($backupDir);
+
+        // Ensure target directory exists on target disk
+        Storage::disk($disk)->makeDirectory($backupDir);
 
         // Set password via environment variable for security
         putenv("PGPASSWORD={$config['password']}");
@@ -196,7 +202,7 @@ class BackupDatabase extends Command
             $content = $this->encryptData($content);
         }
 
-        Storage::disk('local')->put($backupPath, $content);
+        Storage::disk($disk)->put($backupPath, $content);
 
         return $backupPath;
     }
