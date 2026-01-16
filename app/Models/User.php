@@ -29,6 +29,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'company_address',
         'company_phone',
         'company_kvk',
+        'company_btw',
         'company_iban',
         'default_payment_terms',
         'invoice_prefix',

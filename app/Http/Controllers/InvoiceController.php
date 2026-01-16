@@ -118,6 +118,7 @@ class InvoiceController extends Controller
             'customer_email' => 'nullable|email|max:255',
             'customer_address' => 'nullable|string|max:255',
             'customer_phone' => 'nullable|string|max:50',
+            'customer_vat' => 'nullable|string|max:50',
 
             // Invoice fields
             'invoice_date' => 'required|date',
@@ -254,11 +255,13 @@ class InvoiceController extends Controller
                     'company_address' => $validated['company_address'],
                     'company_phone' => $validated['company_phone'] ?? null,
                     'company_kvk' => $validated['company_kvk'] ?? null,
+                    'company_vat' => $validated['company_btw'] ?? null,
                     'company_iban' => $validated['company_iban'] ?? null,
                     'customer_name' => $validated['customer_name'],
                     'customer_email' => $validated['customer_email'] ?? null,
                     'customer_address' => $validated['customer_address'] ?? null,
                     'customer_phone' => $validated['customer_phone'] ?? null,
+                    'customer_vat' => $validated['customer_vat'] ?? null,
                     'invoice_date' => $validated['invoice_date'],
                     'due_date' => $dueDateForDb,
                     'payment_terms' => $validated['payment_terms'],

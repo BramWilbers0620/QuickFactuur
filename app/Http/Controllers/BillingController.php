@@ -23,6 +23,13 @@ class BillingController extends Controller
     {
         $user = Auth::user();
 
+        // Validate Stripe configuration
+        if (empty(config('cashier.key')) || empty(config('cashier.secret'))) {
+            Log::error('Stripe is not configured. Set STRIPE_KEY and STRIPE_SECRET in .env');
+            return redirect()->back()
+                ->with('error', 'Betalingen zijn momenteel niet beschikbaar. Neem contact op met support.');
+        }
+
         $validated = $request->validate([
             'plan' => 'required|in:monthly,yearly',
         ]);

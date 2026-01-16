@@ -383,7 +383,7 @@
                                 <span class="text-slate-600">BTW (<span id="vat-percentage-display">21</span>%)</span>
                                 <span id="vat-display" class="font-semibold text-slate-900">€ 0,00</span>
                             </div>
-                            <div class="flex justify-between items-center py-3 px-4 bg-gradient-to-r from-emerald-500 to-green-500 rounded-xl text-white">
+                            <div class="flex justify-between items-center py-3 px-4 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl text-white">
                                 <span class="font-semibold">Totaal</span>
                                 <span id="total-display" class="text-xl font-bold">€ 0,00</span>
                             </div>
