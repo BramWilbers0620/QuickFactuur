@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use App\Models\Quote;
 use App\Models\Customer;
+use App\Enums\QuoteStatus;
+use App\Http\Requests\StoreQuoteRequest;
 use App\Http\Controllers\DashboardController;
 use PDF;
 
@@ -62,35 +64,11 @@ class QuoteController extends Controller
     /**
      * Generate a PDF quote.
      */
-    public function generate(Request $request)
+    public function generate(StoreQuoteRequest $request)
     {
         $this->ensureUserHasAccess();
 
-        $validated = $request->validate([
-            'logo' => 'nullable|file|mimes:png,jpg,jpeg|max:2048',
-            'brand_color' => 'required|string|regex:/^#[0-9A-Fa-f]{6}$/',
-            'company_name' => 'required|string|max:255',
-            'company_email' => 'required|email|max:255',
-            'company_address' => 'required|string|max:255',
-            'company_phone' => 'nullable|string|max:50',
-            'company_kvk' => 'nullable|string|max:20',
-            // Dutch BTW number format: NL + 9 digits + B + 2 digits (e.g., NL123456789B01)
-            'company_btw' => ['nullable', 'string', 'max:20', 'regex:/^(NL\d{9}B\d{2})?$/i'],
-            'company_iban' => 'nullable|string|max:50',
-            'customer_name' => 'required|string|max:255',
-            'customer_email' => 'nullable|email|max:255',
-            'customer_address' => 'nullable|string|max:255',
-            'customer_phone' => 'nullable|string|max:50',
-            'customer_vat' => 'nullable|string|max:50',
-            'quote_date' => 'required|date',
-            'valid_days' => 'required|integer|in:14,30,60,90',
-            'vat_rate' => 'required|integer|in:0,9,21',
-            'notes' => 'nullable|string|max:2000',
-            'items' => 'required|array|min:1',
-            'items.*.description' => 'required|string|max:500',
-            'items.*.rate' => 'required|numeric|min:0|max:999999.99',
-            'items.*.quantity' => 'required|integer|min:1|max:10000',
-        ]);
+        $validated = $request->validated();
 
         // Handle logo upload - save to disk and convert to base64 for PDF
         $logoData = null;
@@ -148,7 +126,7 @@ class QuoteController extends Controller
         $vat = round($subtotal * $vatRate, 2);
         $total = round($subtotal + $vat, 2);
 
-        $validUntil = Carbon::parse($validated['quote_date'])->addDays($validated['valid_days']);
+        $validUntil = Carbon::parse($validated['quote_date'])->addDays((int) $validated['valid_days']);
 
         // Quote number will be generated inside transaction
         $quoteNumber = null;
@@ -312,8 +290,114 @@ class QuoteController extends Controller
 
         $quote->update(['status' => $validated['status']]);
 
+        // Return JSON for AJAX requests, redirect for normal requests
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Status bijgewerkt naar ' . QuoteStatus::from($validated['status'])->label()
+            ]);
+        }
+
         return redirect()->back()
-            ->with('success', 'Status bijgewerkt naar ' . Quote::$statusLabels[$validated['status']]);
+            ->with('success', 'Status bijgewerkt naar ' . QuoteStatus::from($validated['status'])->label());
+    }
+
+    /**
+     * Duplicate an existing quote (show form pre-filled with quote data).
+     */
+    public function duplicate(Quote $quote)
+    {
+        $this->authorize('view', $quote);
+        $this->ensureUserHasAccess();
+
+        $user = auth()->user();
+
+        // Generate next quote number preview
+        $prefix = $user->quote_prefix ?? 'OFF';
+        $quoteCount = Quote::withTrashed()->where('user_id', $user->id)->count();
+        $nextQuoteNumber = $prefix . sprintf('%04d', $quoteCount + 1);
+
+        $companyProfile = [
+            'name' => $user->company_name,
+            'address' => $user->company_address,
+            'email' => $user->email,
+            'phone' => $user->company_phone,
+            'kvk' => $user->company_kvk,
+            'btw' => $user->company_btw,
+            'iban' => $user->company_iban,
+        ];
+
+        $customers = Customer::where('user_id', auth()->id())
+            ->orderBy('name')
+            ->get();
+
+        // Prepare duplicate data (quote data to pre-fill the form)
+        $duplicateData = [
+            'customer_name' => $quote->customer_name,
+            'customer_email' => $quote->customer_email,
+            'customer_address' => $quote->customer_address,
+            'customer_phone' => $quote->customer_phone,
+            'customer_vat' => $quote->customer_vat,
+            'items' => $quote->items,
+            'vat_rate' => $quote->vat_rate,
+            'valid_days' => 30, // Default to 30 days for new quote
+            'notes' => $quote->notes,
+            'brand_color' => $quote->brand_color,
+        ];
+
+        return view('quotes.form', compact('nextQuoteNumber', 'companyProfile', 'customers', 'duplicateData'));
+    }
+
+    /**
+     * Send quote via email.
+     */
+    public function sendEmail(Quote $quote)
+    {
+        $this->authorize('view', $quote);
+
+        if (!$quote->customer_email) {
+            return redirect()->back()->with('error', 'Deze klant heeft geen e-mailadres.');
+        }
+
+        if (!$quote->pdf_path || !Storage::disk('local')->exists($quote->pdf_path)) {
+            return redirect()->back()->with('error', 'PDF bestand niet gevonden.');
+        }
+
+        try {
+            \Illuminate\Support\Facades\Mail::to($quote->customer_email)->send(new \App\Mail\QuoteMail($quote));
+
+            $quote->update([
+                'status' => 'verzonden',
+            ]);
+
+            Log::info('Quote emailed', [
+                'quote_id' => $quote->id,
+                'to' => $quote->customer_email,
+            ]);
+
+            if (request()->expectsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Offerte verzonden naar ' . $quote->customer_email
+                ]);
+            }
+
+            return redirect()->back()->with('success', 'Offerte verzonden naar ' . $quote->customer_email);
+        } catch (\Exception $e) {
+            Log::error('Quote email failed', [
+                'quote_id' => $quote->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            if (request()->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Er ging iets mis bij het versturen van de e-mail.'
+                ], 500);
+            }
+
+            return redirect()->back()->with('error', 'Er ging iets mis bij het versturen van de e-mail.');
+        }
     }
 
     /**

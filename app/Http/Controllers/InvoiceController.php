@@ -12,6 +12,8 @@ use Carbon\Carbon;
 use App\Models\Invoice;
 use App\Models\Customer;
 use App\Mail\InvoiceMail;
+use App\Enums\InvoiceStatus;
+use App\Http\Requests\StoreInvoiceRequest;
 use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Mail;
 use PDF;
@@ -54,7 +56,7 @@ class InvoiceController extends Controller
         $invoices = $query->orderBy('created_at', 'desc')->paginate(10)->withQueryString();
 
         // Get filter options for the view
-        $statuses = Invoice::$statusLabels;
+        $statuses = InvoiceStatus::options();
 
         return view('invoice.index', compact('invoices', 'statuses'));
     }
@@ -94,51 +96,11 @@ class InvoiceController extends Controller
     /**
      * Genereer een PDF factuur.
      */
-    public function generate(Request $request)
+    public function generate(StoreInvoiceRequest $request)
     {
         $this->ensureUserHasAccess();
 
-        $validated = $request->validate([
-            // Logo and branding
-            'logo' => 'nullable|file|mimes:png,jpg,jpeg|max:2048',
-            'brand_color' => 'required|string|regex:/^#[0-9A-Fa-f]{6}$/',
-
-            // Company fields
-            'company_name' => 'required|string|max:255',
-            'company_email' => 'required|email|max:255',
-            'company_address' => 'required|string|max:255',
-            'company_phone' => 'nullable|string|max:50',
-            'company_kvk' => 'nullable|string|max:20',
-            // Dutch BTW number format: NL + 9 digits + B + 2 digits (e.g., NL123456789B01)
-            'company_btw' => ['nullable', 'string', 'max:20', 'regex:/^(NL\d{9}B\d{2})?$/i'],
-            'company_iban' => 'nullable|string|max:50',
-
-            // Customer fields
-            'customer_name' => 'required|string|max:255',
-            'customer_email' => 'nullable|email|max:255',
-            'customer_address' => 'nullable|string|max:255',
-            'customer_phone' => 'nullable|string|max:50',
-            'customer_vat' => 'nullable|string|max:50',
-
-            // Invoice fields
-            'invoice_date' => 'required|date',
-            'payment_terms' => 'required|string|in:14,30,60,direct',
-            'vat_rate' => 'required|integer|in:0,9,21',
-            'notes' => 'nullable|string|max:2000',
-
-            // Items
-            'items' => 'required|array|min:1',
-            'items.*.description' => 'required|string|max:500',
-            'items.*.rate' => 'required|numeric|min:0|max:999999.99',
-            'items.*.quantity' => 'required|integer|min:1|max:10000',
-        ], [
-            'logo.max' => 'Het logo mag maximaal 2MB zijn.',
-            'logo.mimes' => 'Het logo moet een PNG of JPG bestand zijn.',
-            'items.required' => 'Voeg minimaal één factuurregel toe.',
-            'items.*.description.required' => 'Vul een beschrijving in voor elke regel.',
-            'items.*.rate.required' => 'Vul een tarief in voor elke regel.',
-            'items.*.quantity.required' => 'Vul een aantal in voor elke regel.',
-        ]);
+        $validated = $request->validated();
 
         // Handle logo upload - save to disk and convert to base64 for PDF
         $logoData = null;
@@ -362,7 +324,15 @@ class InvoiceController extends Controller
 
         $invoice->update($updateData);
 
-        return redirect()->back()->with('success', 'Status bijgewerkt naar ' . Invoice::$statusLabels[$validated['status']]);
+        // Return JSON for AJAX requests, redirect for normal requests
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Status bijgewerkt naar ' . InvoiceStatus::from($validated['status'])->label()
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Status bijgewerkt naar ' . InvoiceStatus::from($validated['status'])->label());
     }
 
     /**
@@ -412,6 +382,52 @@ class InvoiceController extends Controller
         $this->authorize('view', $invoice);
 
         return view('invoice.show', compact('invoice'));
+    }
+
+    /**
+     * Duplicate an existing invoice (show form pre-filled with invoice data).
+     */
+    public function duplicate(Invoice $invoice)
+    {
+        $this->authorize('view', $invoice);
+        $this->ensureUserHasAccess();
+
+        $user = auth()->user();
+
+        // Generate next invoice number preview
+        $prefix = $user->invoice_prefix ?? 'FAC';
+        $invoiceCount = Invoice::withTrashed()->where('user_id', $user->id)->count();
+        $nextInvoiceNumber = $prefix . sprintf('%04d', $invoiceCount + 1);
+
+        $companyProfile = [
+            'name' => $user->company_name,
+            'address' => $user->company_address,
+            'email' => $user->email,
+            'phone' => $user->company_phone,
+            'kvk' => $user->company_kvk,
+            'btw' => $user->company_btw,
+            'iban' => $user->company_iban,
+        ];
+
+        $customers = Customer::where('user_id', auth()->id())
+            ->orderBy('name')
+            ->get();
+
+        // Prepare duplicate data (invoice data to pre-fill the form)
+        $duplicateData = [
+            'customer_name' => $invoice->customer_name,
+            'customer_email' => $invoice->customer_email,
+            'customer_address' => $invoice->customer_address,
+            'customer_phone' => $invoice->customer_phone,
+            'customer_vat' => $invoice->customer_vat,
+            'items' => $invoice->items,
+            'vat_rate' => $invoice->vat_rate,
+            'payment_terms' => $invoice->payment_terms,
+            'notes' => $invoice->notes,
+            'brand_color' => $invoice->brand_color,
+        ];
+
+        return view('invoice.form', compact('nextInvoiceNumber', 'companyProfile', 'customers', 'duplicateData'));
     }
 
     /**

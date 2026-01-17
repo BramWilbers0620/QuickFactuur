@@ -71,28 +71,6 @@ class Invoice extends Model
     ];
 
     /**
-     * Status labels in Dutch.
-     * @deprecated Use InvoiceStatus enum instead
-     */
-    public static array $statusLabels = [
-        'concept' => 'Concept',
-        'verzonden' => 'Verzonden',
-        'betaald' => 'Betaald',
-        'te_laat' => 'Te laat',
-    ];
-
-    /**
-     * Status colors for badges.
-     * @deprecated Use InvoiceStatus enum instead
-     */
-    public static array $statusColors = [
-        'concept' => 'bg-slate-100 text-slate-700 border-slate-200',
-        'verzonden' => 'bg-blue-100 text-blue-700 border-blue-200',
-        'betaald' => 'bg-emerald-100 text-emerald-700 border-emerald-200',
-        'te_laat' => 'bg-red-100 text-red-700 border-red-200',
-    ];
-
-    /**
      * Get status as enum.
      */
     public function getStatusEnumAttribute(): ?InvoiceStatus
@@ -113,7 +91,7 @@ class Invoice extends Model
      */
     public function getStatusColorAttribute(): string
     {
-        return self::$statusColors[$this->status] ?? self::$statusColors['concept'];
+        return $this->status_enum?->badgeClasses() ?? InvoiceStatus::CONCEPT->badgeClasses();
     }
 
     /**

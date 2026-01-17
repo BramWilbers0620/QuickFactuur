@@ -31,7 +31,7 @@ class QuoteService
     {
         $processedItems = $this->processItems($data['items']);
         $totals = $this->calculateTotals($processedItems, $data['vat_rate']);
-        $validUntil = Carbon::parse($data['quote_date'])->addDays($data['valid_days']);
+        $validUntil = Carbon::parse($data['quote_date'])->addDays((int) $data['valid_days']);
 
         return DB::transaction(function () use ($user, $data, $processedItems, $totals, $validUntil, $logoPath) {
             $quoteNumber = Quote::generateNextNumber($user->id);
@@ -44,11 +44,13 @@ class QuoteService
                 'company_address' => $data['company_address'],
                 'company_phone' => $data['company_phone'] ?? null,
                 'company_kvk' => $data['company_kvk'] ?? null,
+                'company_vat' => $data['company_btw'] ?? null,
                 'company_iban' => $data['company_iban'] ?? null,
                 'customer_name' => $data['customer_name'],
                 'customer_email' => $data['customer_email'] ?? null,
                 'customer_address' => $data['customer_address'] ?? null,
                 'customer_phone' => $data['customer_phone'] ?? null,
+                'customer_vat' => $data['customer_vat'] ?? null,
                 'quote_date' => $data['quote_date'],
                 'valid_until' => $validUntil,
                 'description' => $processedItems[0]['description'] ?? 'Diverse',
@@ -94,6 +96,7 @@ class QuoteService
                 'address' => $quote->company_address,
                 'phone' => $quote->company_phone,
                 'kvk' => $quote->company_kvk,
+                'btw' => $quote->company_vat,
                 'iban' => $quote->company_iban,
             ],
             'customer' => [
@@ -101,6 +104,7 @@ class QuoteService
                 'email' => $quote->customer_email,
                 'address' => $quote->customer_address,
                 'phone' => $quote->customer_phone,
+                'vat' => $quote->customer_vat,
             ],
             'items' => $quote->items,
             'subtotal' => $quote->amount,

@@ -225,7 +225,8 @@
                                                 data-name="{{ $customer->name }}"
                                                 data-email="{{ $customer->email }}"
                                                 data-address="{{ $customer->address }}"
-                                                data-phone="{{ $customer->phone }}">
+                                                data-phone="{{ $customer->phone }}"
+                                                data-vat="{{ $customer->vat_number }}">
                                             {{ $customer->name }}
                                         </option>
                                     @endforeach
@@ -235,30 +236,37 @@
 
                             <div>
                                 <label for="customer_name" class="block text-sm font-medium text-slate-600 mb-1.5">Klantnaam *</label>
-                                <input type="text" id="customer_name" name="customer_name" value="{{ old('customer_name') }}"
+                                <input type="text" id="customer_name" name="customer_name" value="{{ old('customer_name', $duplicateData['customer_name'] ?? '') }}"
                                        class="w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all @error('customer_name') border-red-400 bg-red-50 @enderror"
                                        placeholder="Naam klant of bedrijf" required>
                             </div>
 
                             <div>
                                 <label for="customer_email" class="block text-sm font-medium text-slate-600 mb-1.5">E-mail</label>
-                                <input type="email" id="customer_email" name="customer_email" value="{{ old('customer_email') }}"
+                                <input type="email" id="customer_email" name="customer_email" value="{{ old('customer_email', $duplicateData['customer_email'] ?? '') }}"
                                        class="w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                                        placeholder="klant@email.nl">
                             </div>
 
                             <div>
                                 <label for="customer_address" class="block text-sm font-medium text-slate-600 mb-1.5">Adres</label>
-                                <input type="text" id="customer_address" name="customer_address" value="{{ old('customer_address') }}"
+                                <input type="text" id="customer_address" name="customer_address" value="{{ old('customer_address', $duplicateData['customer_address'] ?? '') }}"
                                        class="w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                                        placeholder="Straat 123, 1234 AB Stad">
                             </div>
 
                             <div>
                                 <label for="customer_phone" class="block text-sm font-medium text-slate-600 mb-1.5">Telefoon</label>
-                                <input type="tel" id="customer_phone" name="customer_phone" value="{{ old('customer_phone') }}"
+                                <input type="tel" id="customer_phone" name="customer_phone" value="{{ old('customer_phone', $duplicateData['customer_phone'] ?? '') }}"
                                        class="w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                                        placeholder="06 12345678">
+                            </div>
+
+                            <div>
+                                <label for="customer_vat" class="block text-sm font-medium text-slate-600 mb-1.5">BTW-nummer klant</label>
+                                <input type="text" id="customer_vat" name="customer_vat" value="{{ old('customer_vat', $duplicateData['customer_vat'] ?? '') }}"
+                                       class="w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                                       placeholder="NL123456789B01">
                             </div>
 
                         </div>
@@ -282,14 +290,19 @@
                                    class="w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all" required>
                         </div>
 
+                        @php
+                            $selectedValidDays = old('valid_days', $duplicateData['valid_days'] ?? '30');
+                            $selectedVatRate = old('vat_rate', $duplicateData['vat_rate'] ?? '21');
+                        @endphp
+
                         <div>
                             <label for="valid_days" class="block text-sm font-medium text-slate-600 mb-1.5">Geldig voor</label>
                             <select id="valid_days" name="valid_days"
                                     class="w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all bg-white">
-                                <option value="14" {{ old('valid_days') == '14' ? 'selected' : '' }}>14 dagen</option>
-                                <option value="30" {{ old('valid_days', '30') == '30' ? 'selected' : '' }}>30 dagen</option>
-                                <option value="60" {{ old('valid_days') == '60' ? 'selected' : '' }}>60 dagen</option>
-                                <option value="90" {{ old('valid_days') == '90' ? 'selected' : '' }}>90 dagen</option>
+                                <option value="14" {{ $selectedValidDays == '14' ? 'selected' : '' }}>14 dagen</option>
+                                <option value="30" {{ $selectedValidDays == '30' ? 'selected' : '' }}>30 dagen</option>
+                                <option value="60" {{ $selectedValidDays == '60' ? 'selected' : '' }}>60 dagen</option>
+                                <option value="90" {{ $selectedValidDays == '90' ? 'selected' : '' }}>90 dagen</option>
                             </select>
                         </div>
 
@@ -297,9 +310,9 @@
                             <label for="vat_rate" class="block text-sm font-medium text-slate-600 mb-1.5">BTW-tarief</label>
                             <select id="vat_rate" name="vat_rate"
                                     class="w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white">
-                                <option value="21" {{ old('vat_rate', '21') == '21' ? 'selected' : '' }}>21% (standaard)</option>
-                                <option value="9" {{ old('vat_rate') == '9' ? 'selected' : '' }}>9% (verlaagd)</option>
-                                <option value="0" {{ old('vat_rate') == '0' ? 'selected' : '' }}>0% (vrijgesteld)</option>
+                                <option value="21" {{ $selectedVatRate == '21' ? 'selected' : '' }}>21% (standaard)</option>
+                                <option value="9" {{ $selectedVatRate == '9' ? 'selected' : '' }}>9% (verlaagd)</option>
+                                <option value="0" {{ $selectedVatRate == '0' ? 'selected' : '' }}>0% (vrijgesteld)</option>
                             </select>
                         </div>
                     </div>
@@ -336,25 +349,30 @@
                         </div>
 
                         <!-- Invoice Lines Container -->
+                        @php
+                            $items = $duplicateData['items'] ?? [['description' => '', 'price' => '', 'quantity' => 1]];
+                        @endphp
                         <div id="invoice-lines" class="border border-slate-200 rounded-b-xl md:rounded-t-none rounded-xl divide-y divide-slate-100">
-                            <!-- Default first row -->
+                            @foreach($items as $index => $item)
                             <div class="invoice-line grid grid-cols-1 md:grid-cols-12 gap-4 p-4 items-center">
                                 <div class="md:col-span-5">
                                     <label class="md:hidden text-xs font-medium text-slate-500 mb-1 block">Beschrijving</label>
-                                    <input type="text" name="items[0][description]" placeholder="Product of dienst beschrijving"
+                                    <input type="text" name="items[{{ $index }}][description]" placeholder="Product of dienst beschrijving"
+                                           value="{{ $item['description'] ?? '' }}"
                                            class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
                                 </div>
                                 <div class="md:col-span-2">
                                     <label class="md:hidden text-xs font-medium text-slate-500 mb-1 block">Prijs</label>
                                     <div class="relative">
                                         <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm leading-none">€</span>
-                                        <input type="number" name="items[0][rate]" step="0.01" min="0" placeholder="0.00"
+                                        <input type="number" name="items[{{ $index }}][rate]" step="0.01" min="0" placeholder="0.00"
+                                               value="{{ $item['price'] ?? '' }}"
                                                class="item-rate w-full border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-sm text-right focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
                                     </div>
                                 </div>
                                 <div class="md:col-span-2">
                                     <label class="md:hidden text-xs font-medium text-slate-500 mb-1 block">Aantal</label>
-                                    <input type="number" name="items[0][quantity]" min="1" value="1" placeholder="1"
+                                    <input type="number" name="items[{{ $index }}][quantity]" min="1" value="{{ $item['quantity'] ?? 1 }}" placeholder="1"
                                            class="item-quantity w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-right focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
                                 </div>
                                 <div class="md:col-span-2">
@@ -362,13 +380,14 @@
                                     <div class="item-total text-right font-semibold text-slate-700 py-2">€ 0,00</div>
                                 </div>
                                 <div class="md:col-span-1 flex justify-end">
-                                    <button type="button" class="remove-row-btn p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-50 cursor-not-allowed" disabled>
+                                    <button type="button" class="remove-row-btn p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors {{ count($items) === 1 ? 'opacity-50 cursor-not-allowed' : '' }}" {{ count($items) === 1 ? 'disabled' : '' }}>
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                                         </svg>
                                     </button>
                                 </div>
                             </div>
+                            @endforeach
                         </div>
                     </div>
 
@@ -395,7 +414,7 @@
                         <label for="notes" class="block text-sm font-medium text-slate-600 mb-1.5">Opmerkingen / Notities</label>
                         <textarea id="notes" name="notes" rows="3"
                                   class="w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all resize-none"
-                                  placeholder="Eventuele extra opmerkingen voor de offerte...">{{ old('notes') }}</textarea>
+                                  placeholder="Eventuele extra opmerkingen voor de offerte...">{{ old('notes', $duplicateData['notes'] ?? '') }}</textarea>
                     </div>
 
                     <!-- Action Buttons -->
@@ -459,7 +478,7 @@
     </div>
 
     <script>
-        let rowIndex = 1;
+        let rowIndex = {{ count($duplicateData['items'] ?? [['description' => '', 'price' => '', 'quantity' => 1]]) }};
 
         function getVatRate() {
             const vatSelect = document.getElementById('vat_rate');
@@ -669,12 +688,14 @@
                 document.getElementById('customer_email').value = option.dataset.email || '';
                 document.getElementById('customer_address').value = option.dataset.address || '';
                 document.getElementById('customer_phone').value = option.dataset.phone || '';
+                document.getElementById('customer_vat').value = option.dataset.vat || '';
             } else {
                 // Clear fields if "select" option is chosen
                 document.getElementById('customer_name').value = '';
                 document.getElementById('customer_email').value = '';
                 document.getElementById('customer_address').value = '';
                 document.getElementById('customer_phone').value = '';
+                document.getElementById('customer_vat').value = '';
             }
         }
     </script>

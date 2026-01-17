@@ -190,6 +190,13 @@
                                                         </svg>
                                                     </a>
                                                 @endif
+                                                <a href="{{ route('invoice.duplicate', $invoice) }}"
+                                                   class="inline-flex items-center px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-600 text-sm font-medium rounded-lg transition-colors"
+                                                   title="Dupliceren">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                                    </svg>
+                                                </a>
                                                 @if($invoice->customer_email)
                                                     <button onclick="sendEmail({{ $invoice->id }})"
                                                             class="inline-flex items-center px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-600 text-sm font-medium rounded-lg transition-colors"
@@ -231,15 +238,24 @@
                                     <div class="text-sm text-slate-600">{{ $invoice->customer_name }}</div>
                                     <div class="text-xs text-slate-500">{{ $invoice->created_at->format('d-m-Y H:i') }}</div>
                                 </div>
-                                @if($invoice->pdf_path)
-                                    <a href="{{ route('invoice.download', $invoice) }}"
-                                       class="mt-3 inline-flex items-center px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 text-sm font-medium rounded-lg transition-colors">
+                                <div class="mt-3 flex flex-wrap gap-2">
+                                    @if($invoice->pdf_path)
+                                        <a href="{{ route('invoice.download', $invoice) }}"
+                                           class="inline-flex items-center px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 text-sm font-medium rounded-lg transition-colors">
+                                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                            </svg>
+                                            Download
+                                        </a>
+                                    @endif
+                                    <a href="{{ route('invoice.duplicate', $invoice) }}"
+                                       class="inline-flex items-center px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-600 text-sm font-medium rounded-lg transition-colors">
                                         <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
                                         </svg>
-                                        Download PDF
+                                        Dupliceren
                                     </a>
-                                @endif
+                                </div>
                             </div>
                         @endforeach
                     </div>
@@ -284,6 +300,7 @@
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Accept': 'application/json',
                     'X-CSRF-TOKEN': '{{ csrf_token() }}'
                 },
                 body: JSON.stringify({ status: status })
