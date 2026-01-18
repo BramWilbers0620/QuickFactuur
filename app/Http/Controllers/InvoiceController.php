@@ -338,15 +338,21 @@ class InvoiceController extends Controller
     /**
      * Send invoice via email.
      */
-    public function sendEmail(Invoice $invoice)
+    public function sendEmail(Request $request, Invoice $invoice)
     {
         $this->authorize('sendEmail', $invoice);
 
         if (!$invoice->customer_email) {
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => 'Deze klant heeft geen e-mailadres.'], 422);
+            }
             return redirect()->back()->with('error', 'Deze klant heeft geen e-mailadres.');
         }
 
         if (!$invoice->pdf_path || !Storage::disk('local')->exists($invoice->pdf_path)) {
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => 'PDF bestand niet gevonden.'], 404);
+            }
             return redirect()->back()->with('error', 'PDF bestand niet gevonden.');
         }
 
@@ -360,8 +366,11 @@ class InvoiceController extends Controller
 
             Log::info('Invoice emailed', [
                 'invoice_id' => $invoice->id,
-                'to' => $invoice->customer_email,
             ]);
+
+            if ($request->expectsJson()) {
+                return response()->json(['success' => true, 'message' => 'Factuur verzonden naar ' . $invoice->customer_email]);
+            }
 
             return redirect()->back()->with('success', 'Factuur verzonden naar ' . $invoice->customer_email);
         } catch (\Exception $e) {
@@ -369,6 +378,10 @@ class InvoiceController extends Controller
                 'invoice_id' => $invoice->id,
                 'error' => $e->getMessage(),
             ]);
+
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => 'Er ging iets mis bij het versturen van de e-mail.'], 500);
+            }
 
             return redirect()->back()->with('error', 'Er ging iets mis bij het versturen van de e-mail.');
         }
