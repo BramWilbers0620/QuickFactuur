@@ -49,6 +49,8 @@ Route::middleware(['auth', 'subscribed'])->group(function () {
     Route::post('/facturen/{invoice}/email', [InvoiceController::class, 'sendEmail'])
         ->middleware('throttle:10,1')
         ->name('invoice.email');
+    Route::get('/facturen/{invoice}/dupliceren', [InvoiceController::class, 'duplicate'])
+        ->name('invoice.duplicate');
 });
 
 // Offertes — alleen mogelijk voor betalende gebruikers
@@ -69,6 +71,11 @@ Route::middleware(['auth', 'subscribed'])->group(function () {
     Route::patch('/offertes/{quote}/status', [QuoteController::class, 'updateStatus'])
         ->middleware('throttle:30,1')
         ->name('quotes.status');
+    Route::get('/offertes/{quote}/dupliceren', [QuoteController::class, 'duplicate'])
+        ->name('quotes.duplicate');
+    Route::post('/offertes/{quote}/email', [QuoteController::class, 'sendEmail'])
+        ->middleware('throttle:10,1')
+        ->name('quotes.email');
 });
 
 // Klantenbeheer — alleen mogelijk voor betalende gebruikers

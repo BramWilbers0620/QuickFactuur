@@ -2,7 +2,7 @@
 
 namespace App\Mail;
 
-use App\Models\Invoice;
+use App\Models\Quote;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -12,18 +12,18 @@ use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Storage;
 
-class InvoiceMail extends Mailable
+class QuoteMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public Invoice $invoice;
+    public Quote $quote;
 
     /**
      * Create a new message instance.
      */
-    public function __construct(Invoice $invoice)
+    public function __construct(Quote $quote)
     {
-        $this->invoice = $invoice;
+        $this->quote = $quote;
     }
 
     /**
@@ -32,7 +32,7 @@ class InvoiceMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Factuur ' . $this->invoice->invoice_number . ' van ' . $this->invoice->company_name,
+            subject: 'Offerte ' . $this->quote->quote_number . ' van ' . $this->quote->company_name,
         );
     }
 
@@ -42,7 +42,7 @@ class InvoiceMail extends Mailable
     public function content(): Content
     {
         return new Content(
-            view: 'emails.invoice',
+            view: 'emails.quote',
         );
     }
 
@@ -51,10 +51,10 @@ class InvoiceMail extends Mailable
      */
     public function attachments(): array
     {
-        if ($this->invoice->pdf_path && Storage::disk('local')->exists($this->invoice->pdf_path)) {
+        if ($this->quote->pdf_path && Storage::disk('local')->exists($this->quote->pdf_path)) {
             return [
-                Attachment::fromStorageDisk('local', $this->invoice->pdf_path)
-                    ->as('factuur-' . $this->invoice->invoice_number . '.pdf')
+                Attachment::fromStorageDisk('local', $this->quote->pdf_path)
+                    ->as('offerte-' . $this->quote->quote_number . '.pdf')
                     ->withMime('application/pdf'),
             ];
         }

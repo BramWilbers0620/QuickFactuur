@@ -41,10 +41,10 @@ enum InvoiceStatus: string
     public function badgeClasses(): string
     {
         return match ($this) {
-            self::CONCEPT => 'bg-gray-100 text-gray-800',
-            self::SENT => 'bg-blue-100 text-blue-800',
-            self::PAID => 'bg-green-100 text-green-800',
-            self::OVERDUE => 'bg-red-100 text-red-800',
+            self::CONCEPT => 'bg-slate-100 text-slate-700 border-slate-200',
+            self::SENT => 'bg-blue-100 text-blue-700 border-blue-200',
+            self::PAID => 'bg-emerald-100 text-emerald-700 border-emerald-200',
+            self::OVERDUE => 'bg-red-100 text-red-700 border-red-200',
         };
     }
 

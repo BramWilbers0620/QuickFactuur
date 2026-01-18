@@ -72,30 +72,6 @@ class Quote extends Model
     ];
 
     /**
-     * Status labels in Dutch.
-     * @deprecated Use QuoteStatus enum instead
-     */
-    public static array $statusLabels = [
-        'concept' => 'Concept',
-        'verzonden' => 'Verzonden',
-        'geaccepteerd' => 'Geaccepteerd',
-        'afgewezen' => 'Afgewezen',
-        'verlopen' => 'Verlopen',
-    ];
-
-    /**
-     * Status colors for badges.
-     * @deprecated Use QuoteStatus enum instead
-     */
-    public static array $statusColors = [
-        'concept' => 'bg-slate-100 text-slate-700 border-slate-200',
-        'verzonden' => 'bg-blue-100 text-blue-700 border-blue-200',
-        'geaccepteerd' => 'bg-emerald-100 text-emerald-700 border-emerald-200',
-        'afgewezen' => 'bg-red-100 text-red-700 border-red-200',
-        'verlopen' => 'bg-amber-100 text-amber-700 border-amber-200',
-    ];
-
-    /**
      * Get status as enum.
      */
     public function getStatusEnumAttribute(): ?QuoteStatus
@@ -116,7 +92,7 @@ class Quote extends Model
      */
     public function getStatusColorAttribute(): string
     {
-        return self::$statusColors[$this->status] ?? self::$statusColors['concept'];
+        return $this->status_enum?->badgeClasses() ?? QuoteStatus::CONCEPT->badgeClasses();
     }
 
     /**

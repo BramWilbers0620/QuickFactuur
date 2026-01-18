@@ -44,11 +44,11 @@ enum QuoteStatus: string
     public function badgeClasses(): string
     {
         return match ($this) {
-            self::CONCEPT => 'bg-gray-100 text-gray-800',
-            self::SENT => 'bg-blue-100 text-blue-800',
-            self::ACCEPTED => 'bg-green-100 text-green-800',
-            self::REJECTED => 'bg-red-100 text-red-800',
-            self::EXPIRED => 'bg-yellow-100 text-yellow-800',
+            self::CONCEPT => 'bg-slate-100 text-slate-700 border-slate-200',
+            self::SENT => 'bg-blue-100 text-blue-700 border-blue-200',
+            self::ACCEPTED => 'bg-emerald-100 text-emerald-700 border-emerald-200',
+            self::REJECTED => 'bg-red-100 text-red-700 border-red-200',
+            self::EXPIRED => 'bg-amber-100 text-amber-700 border-amber-200',
         };
     }
 
