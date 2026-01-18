@@ -350,7 +350,7 @@
 
                         <!-- Invoice Lines Container -->
                         @php
-                            $items = $duplicateData['items'] ?? [['description' => '', 'price' => '', 'quantity' => 1]];
+                            $items = $duplicateData['items'] ?? [['description' => '', 'rate' => '', 'quantity' => 1]];
                         @endphp
                         <div id="invoice-lines" class="border border-slate-200 rounded-b-xl md:rounded-t-none rounded-xl divide-y divide-slate-100">
                             @foreach($items as $index => $item)
@@ -366,7 +366,7 @@
                                     <div class="relative">
                                         <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm leading-none">€</span>
                                         <input type="number" name="items[{{ $index }}][rate]" step="0.01" min="0" placeholder="0.00"
-                                               value="{{ $item['price'] ?? '' }}"
+                                               value="{{ $item['rate'] ?? '' }}"
                                                class="item-rate w-full border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-sm text-right focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
                                     </div>
                                 </div>
@@ -478,7 +478,7 @@
     </div>
 
     <script>
-        let rowIndex = {{ count($duplicateData['items'] ?? [['description' => '', 'price' => '', 'quantity' => 1]]) }};
+        let rowIndex = {{ count($duplicateData['items'] ?? [['description' => '', 'rate' => '', 'quantity' => 1]]) }};
 
         function getVatRate() {
             const vatSelect = document.getElementById('vat_rate');

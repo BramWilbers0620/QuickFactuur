@@ -332,11 +332,11 @@ class QuoteController extends Controller
             ->get();
 
         // Prepare duplicate data (quote data to pre-fill the form)
-        // Map items to use 'price' key instead of 'rate' for form compatibility
+        // Map items to use 'rate' key to match form validation expectations
         $mappedItems = array_map(function ($item) {
             return [
                 'description' => $item['description'] ?? '',
-                'price' => $item['price'] ?? $item['rate'] ?? '',
+                'rate' => $item['price'] ?? $item['rate'] ?? '',
                 'quantity' => $item['quantity'] ?? 1,
             ];
         }, $quote->items ?? []);
