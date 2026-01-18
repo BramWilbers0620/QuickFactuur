@@ -332,13 +332,22 @@ class QuoteController extends Controller
             ->get();
 
         // Prepare duplicate data (quote data to pre-fill the form)
+        // Map items to use 'price' key instead of 'rate' for form compatibility
+        $mappedItems = array_map(function ($item) {
+            return [
+                'description' => $item['description'] ?? '',
+                'price' => $item['price'] ?? $item['rate'] ?? '',
+                'quantity' => $item['quantity'] ?? 1,
+            ];
+        }, $quote->items ?? []);
+
         $duplicateData = [
             'customer_name' => $quote->customer_name,
             'customer_email' => $quote->customer_email,
             'customer_address' => $quote->customer_address,
             'customer_phone' => $quote->customer_phone,
             'customer_vat' => $quote->customer_vat,
-            'items' => $quote->items,
+            'items' => $mappedItems,
             'vat_rate' => $quote->vat_rate,
             'valid_days' => 30, // Default to 30 days for new quote
             'notes' => $quote->notes,
@@ -356,10 +365,16 @@ class QuoteController extends Controller
         $this->authorize('view', $quote);
 
         if (!$quote->customer_email) {
+            if (request()->expectsJson()) {
+                return response()->json(['success' => false, 'message' => 'Deze klant heeft geen e-mailadres.'], 422);
+            }
             return redirect()->back()->with('error', 'Deze klant heeft geen e-mailadres.');
         }
 
         if (!$quote->pdf_path || !Storage::disk('local')->exists($quote->pdf_path)) {
+            if (request()->expectsJson()) {
+                return response()->json(['success' => false, 'message' => 'PDF bestand niet gevonden.'], 404);
+            }
             return redirect()->back()->with('error', 'PDF bestand niet gevonden.');
         }
 

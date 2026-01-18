@@ -53,7 +53,7 @@ class InvoiceMail extends Mailable
     {
         if ($this->invoice->pdf_path && Storage::disk('local')->exists($this->invoice->pdf_path)) {
             return [
-                Attachment::fromStorage($this->invoice->pdf_path)
+                Attachment::fromStorageDisk('local', $this->invoice->pdf_path)
                     ->as('factuur-' . $this->invoice->invoice_number . '.pdf')
                     ->withMime('application/pdf'),
             ];

@@ -53,7 +53,7 @@ class QuoteMail extends Mailable
     {
         if ($this->quote->pdf_path && Storage::disk('local')->exists($this->quote->pdf_path)) {
             return [
-                Attachment::fromStorage($this->quote->pdf_path)
+                Attachment::fromStorageDisk('local', $this->quote->pdf_path)
                     ->as('offerte-' . $this->quote->quote_number . '.pdf')
                     ->withMime('application/pdf'),
             ];

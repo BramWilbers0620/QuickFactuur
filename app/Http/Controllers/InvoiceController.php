@@ -414,13 +414,22 @@ class InvoiceController extends Controller
             ->get();
 
         // Prepare duplicate data (invoice data to pre-fill the form)
+        // Map items to use 'price' key instead of 'rate' for form compatibility
+        $mappedItems = array_map(function ($item) {
+            return [
+                'description' => $item['description'] ?? '',
+                'price' => $item['price'] ?? $item['rate'] ?? '',
+                'quantity' => $item['quantity'] ?? 1,
+            ];
+        }, $invoice->items ?? []);
+
         $duplicateData = [
             'customer_name' => $invoice->customer_name,
             'customer_email' => $invoice->customer_email,
             'customer_address' => $invoice->customer_address,
             'customer_phone' => $invoice->customer_phone,
             'customer_vat' => $invoice->customer_vat,
-            'items' => $invoice->items,
+            'items' => $mappedItems,
             'vat_rate' => $invoice->vat_rate,
             'payment_terms' => $invoice->payment_terms,
             'notes' => $invoice->notes,
