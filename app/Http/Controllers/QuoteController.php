@@ -20,15 +20,41 @@ class QuoteController extends Controller
     /**
      * Display a listing of quotes.
      */
-    public function index()
+    public function index(Request $request)
     {
         $this->ensureUserHasAccess();
 
-        $quotes = Quote::where('user_id', auth()->id())
-            ->orderBy('created_at', 'desc')
-            ->paginate(10);
+        $query = Quote::where('user_id', auth()->id());
 
-        return view('quotes.index', compact('quotes'));
+        // Search by quote number or customer name
+        if ($search = $request->input('search')) {
+            $escapedSearch = str_replace(['%', '_'], ['\\%', '\\_'], $search);
+            $query->where(function ($q) use ($escapedSearch) {
+                $q->where('quote_number', 'like', "%{$escapedSearch}%")
+                  ->orWhere('customer_name', 'like', "%{$escapedSearch}%")
+                  ->orWhere('customer_email', 'like', "%{$escapedSearch}%");
+            });
+        }
+
+        // Filter by status
+        if ($status = $request->input('status')) {
+            $query->where('status', $status);
+        }
+
+        // Filter by date range
+        if ($dateFrom = $request->input('date_from')) {
+            $query->where('quote_date', '>=', $dateFrom);
+        }
+        if ($dateTo = $request->input('date_to')) {
+            $query->where('quote_date', '<=', $dateTo);
+        }
+
+        $quotes = $query->orderBy('created_at', 'desc')->paginate(10)->withQueryString();
+
+        // Get filter options for the view
+        $statuses = QuoteStatus::options();
+
+        return view('quotes.index', compact('quotes', 'statuses'));
     }
 
     /**
@@ -288,7 +314,19 @@ class QuoteController extends Controller
             'status' => 'required|in:concept,verzonden,geaccepteerd,afgewezen,verlopen',
         ]);
 
-        $quote->update(['status' => $validated['status']]);
+        $updateData = ['status' => $validated['status']];
+
+        // Set sent_at timestamp when status changes to verzonden
+        if ($validated['status'] === 'verzonden' && !$quote->sent_at) {
+            $updateData['sent_at'] = now();
+        }
+
+        // Set accepted_at timestamp when status changes to geaccepteerd
+        if ($validated['status'] === 'geaccepteerd' && !$quote->accepted_at) {
+            $updateData['accepted_at'] = now();
+        }
+
+        $quote->update($updateData);
 
         // Return JSON for AJAX requests, redirect for normal requests
         if ($request->expectsJson()) {
@@ -383,11 +421,11 @@ class QuoteController extends Controller
 
             $quote->update([
                 'status' => 'verzonden',
+                'sent_at' => now(),
             ]);
 
             Log::info('Quote emailed', [
                 'quote_id' => $quote->id,
-                'to' => $quote->customer_email,
             ]);
 
             if (request()->expectsJson()) {
