@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Laravel\Cashier\Exceptions\IncompletePayment;
 use App\Mail\SubscriptionStartedMail;
@@ -36,13 +37,22 @@ class BillingController extends Controller
 
         $plan = $validated['plan'];
 
-        // Stop als gebruiker al een betaald abonnement heeft
-        if ($user->subscribed('default')) {
-            return redirect()->route('dashboard')
-                ->with('error', 'Je hebt al een actief abonnement.');
+        // Prevent race condition with cache lock
+        $lockKey = 'subscription_checkout_' . $user->id;
+        $lock = Cache::lock($lockKey, 30);
+
+        if (!$lock->get()) {
+            return redirect()->back()
+                ->with('error', 'Er wordt al een betaling verwerkt. Probeer het over een paar seconden opnieuw.');
         }
 
         try {
+            // Stop als gebruiker al een betaald abonnement heeft
+            if ($user->subscribed('default')) {
+                return redirect()->route('dashboard')
+                    ->with('error', 'Je hebt al een actief abonnement.');
+            }
+
             // Zorg dat gebruiker een Stripe customer heeft
             $user->createOrGetStripeCustomer();
 
@@ -75,11 +85,12 @@ class BillingController extends Controller
                 'user_id' => $user->id,
                 'plan' => $plan,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
             ]);
 
             return redirect()->back()
                 ->with('error', 'Er ging iets mis bij het starten van de betaling. Probeer het later opnieuw.');
+        } finally {
+            $lock->release();
         }
     }
 
@@ -110,10 +121,29 @@ class BillingController extends Controller
                     ->with('error', 'Er ging iets mis bij het verifiëren van je betaling.');
             }
 
-            // Check session was successful
-            if ($session->payment_status !== 'paid' && $session->status !== 'complete') {
+            // Check payment status
+            // For async payment methods (iDEAL, Bancontact), payment_status may be 'unpaid'
+            // while status is 'complete' - this means payment is processing
+            if ($session->payment_status === 'paid') {
+                // Payment confirmed immediately (card payments)
+                Log::info('Checkout session paid', ['user_id' => $user->id]);
+            } elseif ($session->status === 'complete' && $session->payment_status === 'unpaid') {
+                // Async payment (iDEAL/Bancontact) - processing via webhook
+                Log::info('Checkout session complete, payment processing', [
+                    'user_id' => $user->id,
+                    'payment_status' => $session->payment_status,
+                ]);
+                return redirect()->route('dashboard')
+                    ->with('success', 'Je betaling wordt verwerkt. Je ontvangt een bevestiging zodra de betaling is voltooid.');
+            } else {
+                // Actual failure
+                Log::warning('Checkout session not completed', [
+                    'user_id' => $user->id,
+                    'payment_status' => $session->payment_status,
+                    'session_status' => $session->status,
+                ]);
                 return redirect()->route('billing')
-                    ->with('error', 'Je betaling is nog niet voltooid.');
+                    ->with('error', 'Je betaling is niet voltooid. Probeer het opnieuw.');
             }
         } catch (\Exception $e) {
             Log::error('Stripe session verification failed', [
@@ -137,9 +167,9 @@ class BillingController extends Controller
         if ($subscription) {
             $stripePrice = $subscription->stripe_price;
             if ($stripePrice === config('services.stripe.plan_monthly')) {
-                $planLabel = 'Maandelijks (€5/maand)';
+                $planLabel = config('services.stripe.plan_monthly_label');
             } elseif ($stripePrice === config('services.stripe.plan_yearly')) {
-                $planLabel = 'Jaarlijks (€50/jaar)';
+                $planLabel = config('services.stripe.plan_yearly_label');
             }
 
             // Stuur bevestigingsmail

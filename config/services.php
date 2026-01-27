@@ -40,6 +40,8 @@ return [
     'secret' => env('STRIPE_SECRET'),
     'plan_monthly' => env('STRIPE_PLAN_MONTHLY'),
     'plan_yearly' => env('STRIPE_PLAN_YEARLY'),
+    'plan_monthly_label' => env('STRIPE_PLAN_MONTHLY_LABEL', 'Maandelijks (€5/maand)'),
+    'plan_yearly_label' => env('STRIPE_PLAN_YEARLY_LABEL', 'Jaarlijks (€50/jaar)'),
 ],
 
 
