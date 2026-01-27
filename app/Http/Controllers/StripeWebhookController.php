@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Laravel\Cashier\Http\Controllers\WebhookController as CashierController;
@@ -16,22 +15,30 @@ class StripeWebhookController extends CashierController
      */
     public function handleCustomerSubscriptionDeleted(array $payload): \Symfony\Component\HttpFoundation\Response
     {
-        $stripeCustomerId = $payload['data']['object']['customer'] ?? null;
+        try {
+            $stripeCustomerId = $payload['data']['object']['customer'] ?? null;
 
-        if ($stripeCustomerId) {
-            $user = User::where('stripe_id', $stripeCustomerId)->first();
+            if ($stripeCustomerId) {
+                $user = User::where('stripe_id', $stripeCustomerId)->first();
 
-            if ($user) {
-                Log::info('Subscription cancelled for user: ' . $user->email);
+                if ($user) {
+                    Log::info('Subscription cancelled', ['user_id' => $user->id]);
 
-                // Reset trial_ends_at if subscription is cancelled
-                $user->update([
-                    'trial_ends_at' => null,
-                ]);
+                    // Reset trial_ends_at if subscription is cancelled
+                    $user->update([
+                        'trial_ends_at' => null,
+                    ]);
+                }
             }
-        }
 
-        return $this->successMethod();
+            // Call parent to properly mark subscription as canceled in database
+            return parent::handleCustomerSubscriptionDeleted($payload);
+        } catch (\Exception $e) {
+            Log::error('Webhook handleCustomerSubscriptionDeleted failed', [
+                'error' => $e->getMessage(),
+            ]);
+            return $this->successMethod();
+        }
     }
 
     /**
@@ -39,23 +46,39 @@ class StripeWebhookController extends CashierController
      */
     public function handleInvoicePaymentFailed(array $payload): \Symfony\Component\HttpFoundation\Response
     {
-        $stripeCustomerId = $payload['data']['object']['customer'] ?? null;
+        try {
+            $stripeCustomerId = $payload['data']['object']['customer'] ?? null;
 
-        if ($stripeCustomerId) {
-            $user = User::where('stripe_id', $stripeCustomerId)->first();
+            if ($stripeCustomerId) {
+                $user = User::where('stripe_id', $stripeCustomerId)->first();
 
-            if ($user) {
-                $invoiceId = $payload['data']['object']['id'] ?? null;
-                $amount = $payload['data']['object']['amount_due'] ?? null;
+                if ($user) {
+                    $invoiceId = $payload['data']['object']['id'] ?? null;
+                    $amount = $payload['data']['object']['amount_due'] ?? null;
+                    $attemptCount = $payload['data']['object']['attempt_count'] ?? 1;
 
-                Log::warning('Payment failed for user: ' . $user->email, [
-                    'invoice_id' => $invoiceId ?? 'unknown',
-                    'amount' => $amount ?? 0,
-                ]);
+                    Log::warning('Payment failed', [
+                        'user_id' => $user->id,
+                        'invoice_id' => $invoiceId ?? 'unknown',
+                        'amount' => $amount ?? 0,
+                        'attempt_count' => $attemptCount,
+                    ]);
 
-                // Send email notification about failed payment
-                Mail::to($user->email)->queue(new PaymentFailedMail($user, $invoiceId, $amount));
+                    // Send email notification about failed payment
+                    try {
+                        Mail::to($user->email)->send(new PaymentFailedMail($user, $invoiceId, $amount));
+                    } catch (\Exception $mailException) {
+                        Log::error('Failed to send payment failed email', [
+                            'user_id' => $user->id,
+                            'error' => $mailException->getMessage(),
+                        ]);
+                    }
+                }
             }
+        } catch (\Exception $e) {
+            Log::error('Webhook handleInvoicePaymentFailed failed', [
+                'error' => $e->getMessage(),
+            ]);
         }
 
         return $this->successMethod();
@@ -66,21 +89,36 @@ class StripeWebhookController extends CashierController
      */
     public function handleCustomerSubscriptionUpdated(array $payload): \Symfony\Component\HttpFoundation\Response
     {
-        $stripeCustomerId = $payload['data']['object']['customer'] ?? null;
-        $status = $payload['data']['object']['status'] ?? null;
+        try {
+            $stripeCustomerId = $payload['data']['object']['customer'] ?? null;
+            $status = $payload['data']['object']['status'] ?? null;
 
-        if ($stripeCustomerId) {
-            $user = User::where('stripe_id', $stripeCustomerId)->first();
+            if ($stripeCustomerId) {
+                $user = User::where('stripe_id', $stripeCustomerId)->first();
 
-            if ($user) {
-                Log::info('Subscription updated for user: ' . $user->email, [
-                    'status' => $status,
-                    'plan' => $payload['data']['object']['items']['data'][0]['price']['id'] ?? 'unknown',
-                ]);
+                if ($user) {
+                    // Safely get price ID from nested structure
+                    $priceId = 'unknown';
+                    if (isset($payload['data']['object']['items']['data'][0]['price']['id'])) {
+                        $priceId = $payload['data']['object']['items']['data'][0]['price']['id'];
+                    }
+
+                    Log::info('Subscription updated', [
+                        'user_id' => $user->id,
+                        'status' => $status,
+                        'plan' => $priceId,
+                    ]);
+                }
             }
-        }
 
-        return $this->successMethod();
+            // Call parent to sync subscription data
+            return parent::handleCustomerSubscriptionUpdated($payload);
+        } catch (\Exception $e) {
+            Log::error('Webhook handleCustomerSubscriptionUpdated failed', [
+                'error' => $e->getMessage(),
+            ]);
+            return $this->successMethod();
+        }
     }
 
     /**
@@ -88,16 +126,25 @@ class StripeWebhookController extends CashierController
      */
     public function handleChargeRefunded(array $payload): \Symfony\Component\HttpFoundation\Response
     {
-        $stripeCustomerId = $payload['data']['object']['customer'] ?? null;
+        try {
+            $stripeCustomerId = $payload['data']['object']['customer'] ?? null;
 
-        if ($stripeCustomerId) {
-            $user = User::where('stripe_id', $stripeCustomerId)->first();
+            if ($stripeCustomerId) {
+                $user = User::where('stripe_id', $stripeCustomerId)->first();
 
-            if ($user) {
-                Log::info('Charge refunded for user: ' . $user->email, [
-                    'amount' => $payload['data']['object']['amount_refunded'] ?? 0,
-                ]);
+                if ($user) {
+                    $amountRefunded = $payload['data']['object']['amount_refunded'] ?? 0;
+
+                    Log::info('Charge refunded', [
+                        'user_id' => $user->id,
+                        'amount' => $amountRefunded,
+                    ]);
+                }
             }
+        } catch (\Exception $e) {
+            Log::error('Webhook handleChargeRefunded failed', [
+                'error' => $e->getMessage(),
+            ]);
         }
 
         return $this->successMethod();

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Laravel\Cashier\Exceptions\IncompletePayment;
 use App\Mail\SubscriptionStartedMail;
@@ -36,13 +37,22 @@ class BillingController extends Controller
 
         $plan = $validated['plan'];
 
-        // Stop als gebruiker al een betaald abonnement heeft
-        if ($user->subscribed('default')) {
-            return redirect()->route('dashboard')
-                ->with('error', 'Je hebt al een actief abonnement.');
+        // Prevent race condition with cache lock
+        $lockKey = 'subscription_checkout_' . $user->id;
+        $lock = Cache::lock($lockKey, 30);
+
+        if (!$lock->get()) {
+            return redirect()->back()
+                ->with('error', 'Er wordt al een betaling verwerkt. Probeer het over een paar seconden opnieuw.');
         }
 
         try {
+            // Stop als gebruiker al een betaald abonnement heeft
+            if ($user->subscribed('default')) {
+                $lock->release();
+                return redirect()->route('dashboard')
+                    ->with('error', 'Je hebt al een actief abonnement.');
+            }
             // Zorg dat gebruiker een Stripe customer heeft
             $user->createOrGetStripeCustomer();
 
@@ -68,14 +78,16 @@ class BillingController extends Controller
                     'billing_address_collection' => 'auto',
                 ]);
 
+            $lock->release();
             return redirect($checkout->url);
 
         } catch (\Exception $e) {
+            $lock->release();
+
             Log::error('Checkout error', [
                 'user_id' => $user->id,
                 'plan' => $plan,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
             ]);
 
             return redirect()->back()
@@ -110,10 +122,15 @@ class BillingController extends Controller
                     ->with('error', 'Er ging iets mis bij het verifiëren van je betaling.');
             }
 
-            // Check session was successful
-            if ($session->payment_status !== 'paid' && $session->status !== 'complete') {
+            // Check payment was successful - payment_status must be 'paid'
+            if ($session->payment_status !== 'paid') {
+                Log::warning('Checkout session not paid', [
+                    'user_id' => $user->id,
+                    'payment_status' => $session->payment_status,
+                    'session_status' => $session->status,
+                ]);
                 return redirect()->route('billing')
-                    ->with('error', 'Je betaling is nog niet voltooid.');
+                    ->with('error', 'Je betaling is nog niet voltooid. Probeer het opnieuw.');
             }
         } catch (\Exception $e) {
             Log::error('Stripe session verification failed', [
@@ -137,9 +154,9 @@ class BillingController extends Controller
         if ($subscription) {
             $stripePrice = $subscription->stripe_price;
             if ($stripePrice === config('services.stripe.plan_monthly')) {
-                $planLabel = 'Maandelijks (€5/maand)';
+                $planLabel = config('services.stripe.plan_monthly_label');
             } elseif ($stripePrice === config('services.stripe.plan_yearly')) {
-                $planLabel = 'Jaarlijks (€50/jaar)';
+                $planLabel = config('services.stripe.plan_yearly_label');
             }
 
             // Stuur bevestigingsmail
