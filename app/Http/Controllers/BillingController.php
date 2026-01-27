@@ -121,15 +121,29 @@ class BillingController extends Controller
                     ->with('error', 'Er ging iets mis bij het verifiëren van je betaling.');
             }
 
-            // Check payment was successful - payment_status must be 'paid'
-            if ($session->payment_status !== 'paid') {
-                Log::warning('Checkout session not paid', [
+            // Check payment status
+            // For async payment methods (iDEAL, Bancontact), payment_status may be 'unpaid'
+            // while status is 'complete' - this means payment is processing
+            if ($session->payment_status === 'paid') {
+                // Payment confirmed immediately (card payments)
+                Log::info('Checkout session paid', ['user_id' => $user->id]);
+            } elseif ($session->status === 'complete' && $session->payment_status === 'unpaid') {
+                // Async payment (iDEAL/Bancontact) - processing via webhook
+                Log::info('Checkout session complete, payment processing', [
+                    'user_id' => $user->id,
+                    'payment_status' => $session->payment_status,
+                ]);
+                return redirect()->route('dashboard')
+                    ->with('success', 'Je betaling wordt verwerkt. Je ontvangt een bevestiging zodra de betaling is voltooid.');
+            } else {
+                // Actual failure
+                Log::warning('Checkout session not completed', [
                     'user_id' => $user->id,
                     'payment_status' => $session->payment_status,
                     'session_status' => $session->status,
                 ]);
                 return redirect()->route('billing')
-                    ->with('error', 'Je betaling is nog niet voltooid. Probeer het opnieuw.');
+                    ->with('error', 'Je betaling is niet voltooid. Probeer het opnieuw.');
             }
         } catch (\Exception $e) {
             Log::error('Stripe session verification failed', [

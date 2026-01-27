@@ -66,9 +66,10 @@ class StripeWebhookController extends CashierController
                         'attempt_count' => $attemptCount,
                     ]);
 
-                    // Send email notification about failed payment
+                    // Send email notification about failed payment synchronously
+                    // Using sendNow() to bypass queue since this is a critical notification
                     try {
-                        Mail::to($user->email)->send(new PaymentFailedMail($user, $invoiceId, $amount));
+                        Mail::to($user->email)->sendNow(new PaymentFailedMail($user, $invoiceId, $amount));
                     } catch (\Exception $mailException) {
                         Log::error('Failed to send payment failed email', [
                             'user_id' => $user->id,
