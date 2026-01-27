@@ -49,10 +49,10 @@ class BillingController extends Controller
         try {
             // Stop als gebruiker al een betaald abonnement heeft
             if ($user->subscribed('default')) {
-                $lock->release();
                 return redirect()->route('dashboard')
                     ->with('error', 'Je hebt al een actief abonnement.');
             }
+
             // Zorg dat gebruiker een Stripe customer heeft
             $user->createOrGetStripeCustomer();
 
@@ -78,12 +78,9 @@ class BillingController extends Controller
                     'billing_address_collection' => 'auto',
                 ]);
 
-            $lock->release();
             return redirect($checkout->url);
 
         } catch (\Exception $e) {
-            $lock->release();
-
             Log::error('Checkout error', [
                 'user_id' => $user->id,
                 'plan' => $plan,
@@ -92,6 +89,8 @@ class BillingController extends Controller
 
             return redirect()->back()
                 ->with('error', 'Er ging iets mis bij het starten van de betaling. Probeer het later opnieuw.');
+        } finally {
+            $lock->release();
         }
     }
 

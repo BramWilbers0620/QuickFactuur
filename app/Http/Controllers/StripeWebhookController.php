@@ -15,6 +15,7 @@ class StripeWebhookController extends CashierController
      */
     public function handleCustomerSubscriptionDeleted(array $payload): \Symfony\Component\HttpFoundation\Response
     {
+        // Custom logging - wrapped in try-catch so it doesn't prevent parent from running
         try {
             $stripeCustomerId = $payload['data']['object']['customer'] ?? null;
 
@@ -30,15 +31,16 @@ class StripeWebhookController extends CashierController
                     ]);
                 }
             }
-
-            // Call parent to properly mark subscription as canceled in database
-            return parent::handleCustomerSubscriptionDeleted($payload);
         } catch (\Exception $e) {
-            Log::error('Webhook handleCustomerSubscriptionDeleted failed', [
+            // Log error but don't prevent parent from running
+            Log::error('Webhook handleCustomerSubscriptionDeleted custom logic failed', [
                 'error' => $e->getMessage(),
             ]);
-            return $this->successMethod();
         }
+
+        // Always call parent to properly mark subscription as canceled in database
+        // Let parent exceptions bubble up so Stripe knows to retry if it fails
+        return parent::handleCustomerSubscriptionDeleted($payload);
     }
 
     /**
@@ -81,6 +83,7 @@ class StripeWebhookController extends CashierController
             ]);
         }
 
+        // No parent method to call - this is custom handling only
         return $this->successMethod();
     }
 
@@ -89,6 +92,7 @@ class StripeWebhookController extends CashierController
      */
     public function handleCustomerSubscriptionUpdated(array $payload): \Symfony\Component\HttpFoundation\Response
     {
+        // Custom logging - wrapped in try-catch so it doesn't prevent parent from running
         try {
             $stripeCustomerId = $payload['data']['object']['customer'] ?? null;
             $status = $payload['data']['object']['status'] ?? null;
@@ -110,15 +114,16 @@ class StripeWebhookController extends CashierController
                     ]);
                 }
             }
-
-            // Call parent to sync subscription data
-            return parent::handleCustomerSubscriptionUpdated($payload);
         } catch (\Exception $e) {
-            Log::error('Webhook handleCustomerSubscriptionUpdated failed', [
+            // Log error but don't prevent parent from running
+            Log::error('Webhook handleCustomerSubscriptionUpdated custom logic failed', [
                 'error' => $e->getMessage(),
             ]);
-            return $this->successMethod();
         }
+
+        // Always call parent to sync subscription data
+        // Let parent exceptions bubble up so Stripe knows to retry if it fails
+        return parent::handleCustomerSubscriptionUpdated($payload);
     }
 
     /**
@@ -147,6 +152,7 @@ class StripeWebhookController extends CashierController
             ]);
         }
 
+        // No parent method to call - this is custom handling only
         return $this->successMethod();
     }
 }
